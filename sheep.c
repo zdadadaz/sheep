@@ -4,17 +4,18 @@
 #include <stdbool.h>
 #define FILE "sheep.h5"
 #define DATASET "DS1"
-#define N 100
-#define T 100
-#define initSheepNum 10
+#define N 1
+#define T 10
+#define initSheepNum 1
 #define sheepGainFromFood 4
 #define sheepReproduce 4 //%
-#define initWolveNum 5
+#define initWolveNum 1
 #define wolveGainFromFood 20
 #define wolveReproduce 5 //%
 #define Grass 0
+#define max(a, b) ({ __typeof__ (a) _a = (a); __typeof__ (b) _b = (b); _a > _b ? _a : _b; })
 
-int half = 10;
+int half = sqrt(N);
 int tot_sheep=0;
 int tot_wolve=0;
 
@@ -68,11 +69,13 @@ void gen_surroundxy(int curX, int curY, int xlist[8], int ylist[8]){
 
 bool check_move_valid(double animal[N][T], int curX, int curY, int x, int y, int t, int t2)
 {
-    if ((x >= 0) && (x < half) && (y >= 0) && (y < half) && animal[x + y * half][t]==0)
+    if ((x >= 0) && (x < half) && (y >= 0) && (y < half) && (animal[x + y * half][t2]<=0))
+    {
         animal[x + y * half][t2] = animal[curX + curY * half][t];
         if (t2 == t)
             animal[curX + curY * half][t] = 0;
         return true;
+    }
     return false;
 }
 bool check_sheep_exist(double animal[N][T], int x, int y, int t)
@@ -94,21 +97,29 @@ void move(double animal[N][T], int curX, int curY, int t,int t2, int* newX, int*
         int randint = (float)rand() / (float)(RAND_MAX)*7;
         tmpX = xlist[randint];
         tmpY = ylist[randint];
+        // printf("%d,%d\n", tmpX, tmpY);
         flag = check_move_valid(animal, curX, curY, tmpX, tmpY, t, t2);
         if (flag == true){
+            // printf("tmpX %d,tmpY %d\n", tmpX, tmpY);
             *newX = tmpX;
             *newY = tmpY;
             break;
         }
     }
-    if(flag == false)
-    {
+
+    printf("t1 %d, t2 %d, newX %d,newY %d\n", t, t2, curX, curY);
+    // stay the same place
+    if (animal[curX + curY* half][t2] != 0){
         *newX = curX;
         *newY = curY;
+        animal[curX + curY * half][t2] = animal[curX + curY * half][t];
+    }else{
+        printf("all occupied\n");
     }
+        
 }
 void death(double animal[N][T], int curX, int curY, int t, int flag){
-    if (animal[curX + curY* half][t]<0){
+    if (animal[curX + curY* half][t]<=0){
         animal[curX + curY * half][t] = 0;
         if (flag == 0)
             tot_sheep -= 1;
@@ -147,9 +158,10 @@ void init_sheep_wolve(double sheep[N][T], double wolve[N][T])
 {
     int sheepNum = 0;
     while (sheepNum < initSheepNum){
-        int randint = (float)rand() / (float)(RAND_MAX) * (N - 1);
+        int randint = (float)rand() / (float)(RAND_MAX) * (N-1);
         if (sheep[randint][0] == 0){
-            sheep[randint][0] = 2 * sheepGainFromFood * (float)rand() / (float)(RAND_MAX);
+            sheep[randint][0] = max(1.0, 2 * sheepGainFromFood * (float)rand() / (float)(RAND_MAX));
+            // printf("randint %d, sheepNum %d, sheep %f, out %f \n", randint, sheepNum, sheep[randint][0], 2 * sheepGainFromFood * (float)rand() / (float)(RAND_MAX));
             sheepNum++;
             tot_sheep++;
         }
@@ -157,9 +169,9 @@ void init_sheep_wolve(double sheep[N][T], double wolve[N][T])
     int wolveNum = 0;
     while (wolveNum < initWolveNum)
     {
-        int randint = (float)rand() / (float)(RAND_MAX) * (N - 1);
+        int randint = (float)rand() / (float)(RAND_MAX) * (N-1);
         if (wolve[randint][0] == 0){
-            wolve[randint][0] = 2 * wolveGainFromFood * (float)rand() / (float)(RAND_MAX);
+            wolve[randint][0] = max(1.0, 2 * wolveGainFromFood * (float)rand() / (float)(RAND_MAX));
             wolveNum++;
             tot_wolve++;
         }
@@ -189,7 +201,9 @@ void catch_sheep(double wolve[N][T], double sheep[N][T], int *curX, int *curY, i
 }
 
 void ask_sheep(double sheep[N][T], int i, int t){
-    int curY = i/half;
+    if (sheep[i][t] <= 0)
+        return;
+    int curY = i / half;
     int curX = i - curY * half;
     int newX, newY;
     move(sheep, curX, curY, t, t+1, &newX, &newY);
@@ -201,6 +215,8 @@ void ask_sheep(double sheep[N][T], int i, int t){
 }
 void ask_wolve(double wolve[N][T], double sheep[N][T], int i, int t)
 {
+    if (wolve[i][t] <= 0)
+        return;
     int curY = i / half;
     int curX = i - curY * half;
     int newX, newY;
@@ -217,11 +233,12 @@ int main(void)
     init_sheep_wolve(sheep, wolve);
     for (int t = 0; t < T-1; t++)
     {
-        printf("sheep = %d\n", tot_sheep);
-        printf("wolve = %d\n", tot_wolve);
+        // printf("sheep = %d\n", tot_sheep);
+        // printf("wolve = %d\n", tot_wolve);
         for (int i = 0; i < N; i++)
         {
-                ask_sheep(sheep, i, t);
+            printf("t,i %d, %d, sheep value %f\n", t,i, sheep[i][t]);
+            ask_sheep(sheep, i, t);
     //             // ask_wolve(wolve, sheep, i, t);
     //             // if (Grass == 1)
     //             //     ask_patch(grass,i,t)
