@@ -1,4 +1,5 @@
 #include "util.h"
+
 bool check_move_valid(int x, int y)
 {
     int half = N / 2;
