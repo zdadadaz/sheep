@@ -3,7 +3,7 @@ import h5py
 import matplotlib.pyplot as plt
 import math
 
-FILE = "sheep.h5"
+FILE = "wolve.h5"
 DATASET = "DS1"
 
 
@@ -14,15 +14,11 @@ sheep = np.array(sheep)
 N, T = sheep.shape
 
 grid_size = int(np.sqrt(N))
-# plot the first frame and save the markers
 marker = [0]*N
-# for i, coord in enumerate(coords):
-#     marker[i] = plt.scatter(coord[0], coord[1], color='blue', alpha=1, s=10**2)
-#     plt.annotate(txt, (coord[0], coord[1]))
 
 t=1
 half = math.sqrt(N)
-for t in range(0,10):
+for t in range(0,100):
     qq = {}
     count = 0
     for i in range(N):
@@ -35,9 +31,6 @@ for t in range(0,10):
             plt.xlim(-1, grid_size)
             plt.ylim(-1, grid_size)
             plt.annotate(round(sheep[i][t]), (x, y))
-    # tmp = sheep[:][t]
-    # print(tmp[tmp>0])
-    # print(qq)
     plt.title('t: {}, sheep num: {}'.format(str(t),str(count)))
     plt.pause(1)
     plt.clf()
