@@ -3,13 +3,14 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #define FILE "sheep.h5"
+#define FILEw "wolve.h5"
 #define DATASET "DS1"
-#define N 1
-#define T 10
-#define initSheepNum 1
+#define N 25
+#define T 100
+#define initSheepNum 10
 #define sheepGainFromFood 4
 #define sheepReproduce 4 //%
-#define initWolveNum 1
+#define initWolveNum 4
 #define wolveGainFromFood 20
 #define wolveReproduce 5 //%
 #define Grass 0
@@ -25,39 +26,36 @@ int mat2hdf5(double wdata[N][T])
     herr_t status;
     hsize_t dims[2] = {N, T};
 
-    /*
-     * Create a new file using the default properties.
-     */
     file = H5Fcreate(FILE, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
-
-    /*
-     * Create dataspace.  Setting maximum size to NULL sets the maximum
-     * size to be the current size.
-     */
     space = H5Screate_simple(2, dims, NULL);
-
-    /*
-     * Create the dataset and write the floating point data to it.  In
-     * this example we will save the data as 64 bit little endian IEEE
-     * floating point numbers, regardless of the native type.  The HDF5
-     * library automatically converts between different floating point
-     * types.
-     */
     dset = H5Dcreate(file, DATASET, H5T_IEEE_F64LE, space, H5P_DEFAULT,
                      H5P_DEFAULT, H5P_DEFAULT);
     status = H5Dwrite(dset, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT,
                       wdata[0]);
-
-    /*
-     * Close and release resources.
-     */
     status = H5Dclose(dset);
     status = H5Sclose(space);
     status = H5Fclose(file);
 
     return 0;
 }
+int mat2hdf5w(double wdata[N][T])
+{
+    hid_t file, space, dset; /* Handles */
+    herr_t status;
+    hsize_t dims[2] = {N, T};
 
+    file = H5Fcreate(FILEw, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+    space = H5Screate_simple(2, dims, NULL);
+    dset = H5Dcreate(file, DATASET, H5T_IEEE_F64LE, space, H5P_DEFAULT,
+                     H5P_DEFAULT, H5P_DEFAULT);
+    status = H5Dwrite(dset, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT,
+                      wdata[0]);
+    status = H5Dclose(dset);
+    status = H5Sclose(space);
+    status = H5Fclose(file);
+
+    return 0;
+}
 void gen_surroundxy(int curX, int curY, int xlist[8], int ylist[8]){
     int xl[8] = {-1, -1 ,0 ,1, 1,1,0,-1};
     int yl[8] = {0  ,-1,-1,-1, 0,1,1, 1};
@@ -69,7 +67,7 @@ void gen_surroundxy(int curX, int curY, int xlist[8], int ylist[8]){
 
 bool check_move_valid(double animal[N][T], int curX, int curY, int x, int y, int t, int t2)
 {
-    if ((x >= 0) && (x < half) && (y >= 0) && (y < half) && (animal[x + y * half][t2]<=0))
+    if ((x >= 0) && (x < half) && (y >= 0) && (y < half) && (animal[x + y * half][t2] <= 0) && (animal[x + y * half][t] <= 0))
     {
         animal[x + y * half][t2] = animal[curX + curY * half][t];
         if (t2 == t)
@@ -107,16 +105,35 @@ void move(double animal[N][T], int curX, int curY, int t,int t2, int* newX, int*
         }
     }
 
-    printf("t1 %d, t2 %d, newX %d,newY %d\n", t, t2, curX, curY);
+    // printf("t1 %d, t2 %d, newX %d,newY %d\n", t, t2, curX, curY);
     // stay the same place
-    if (animal[curX + curY* half][t2] != 0){
-        *newX = curX;
-        *newY = curY;
-        animal[curX + curY * half][t2] = animal[curX + curY * half][t];
-    }else{
-        printf("all occupied\n");
+    if (flag == false)
+    {
+        if (animal[curX + curY * half][t2] <= 0)
+        {
+            // printf(" t1 %d, t2 %d, stay\n", t, t2);
+            *newX = curX;
+            *newY = curY;
+            animal[curX + curY * half][t2] = animal[curX + curY * half][t];
+        }
+        else
+        {   
+            int count = 0, cnt = 0;
+            while ((count < 1) && cnt < N)
+            {
+                int randint = (float)rand() / (float)(RAND_MAX) * (N - 1);
+                if (animal[randint][t2] <= 0)
+                {
+                    animal[randint][t2] = animal[randint][t];
+                    count++;
+                    printf("fly\n");
+                }
+                cnt++;
+            }
+            if (count <1)
+                printf("all occupied\n");
+        }
     }
-        
 }
 void death(double animal[N][T], int curX, int curY, int t, int flag){
     if (animal[curX + curY* half][t]<=0){
@@ -130,25 +147,32 @@ void death(double animal[N][T], int curX, int curY, int t, int flag){
 void create_animal(double animal[N][T], int curX, int curY, int t, int flag){
     int gainFood = flag == 0 ? sheepGainFromFood : wolveGainFromFood;
     int Energy = 2 * gainFood * (float)rand() / (float)(RAND_MAX);
-    int curIdx = curX + curY *half;
-    int newX, newY;
-    int tmpEnergy;
-
-    tmpEnergy = animal[curIdx][t];
-    animal[curIdx][t] = Energy;
-    move(animal, curX, curY, t, t, &newX, &newY);
-    animal[curIdx][t] = tmpEnergy;
-    if (flag == 0)
-        tot_sheep += 1;
-    else
-        tot_wolve += 1;
+    int count = 0, cnt = 0;
+    int idx = curX + curY *half;
+    while ((count < 1) && cnt < N)
+    {
+        if (animal[cnt][t] <= 0)
+        {
+            animal[cnt][t] = max(1.0, Energy);
+            count++;
+        }
+        cnt++;
+    }
+    if (count>0){
+        if (flag == 0)
+            tot_sheep += 1;
+        else
+            tot_wolve += 1;
+    }else{
+        printf("no place for reproduce flag %d\n",flag);
+    }
 }
 
 void reproduce(double animal[N][T], int curX, int curY, int t, int flag)
 {
-    int randint = (float)rand() / (float)(RAND_MAX)*100;
+    float randint = (float)rand() / (float)(RAND_MAX)*100;
     int cond_reproduce_rate = (flag == 0) ? sheepReproduce : wolveReproduce;
-    if (randint < cond_reproduce_rate){
+    if (randint < (float)cond_reproduce_rate){
         animal[curX + curY * half][t] /= 2;
         create_animal(animal, curX, curY, t, flag);
     }
@@ -210,8 +234,8 @@ void ask_sheep(double sheep[N][T], int i, int t){
     // if Grass == 1{
     //     sheep[newX + newY * half][t] = sheep[newX + newY * half][t]-1
     // }
-    // death(sheep, newX, newY, t+1, 0);
-    // reproduce(sheep, newX, newY, t+1, 0);
+    death(sheep, newX, newY, t+1, 0);
+    reproduce(sheep, newX, newY, t+1, 0);
 }
 void ask_wolve(double wolve[N][T], double sheep[N][T], int i, int t)
 {
@@ -221,8 +245,8 @@ void ask_wolve(double wolve[N][T], double sheep[N][T], int i, int t)
     int curX = i - curY * half;
     int newX, newY;
     move(wolve, curX, curY, t, t+1, &newX, &newY);
-    wolve[i][t+1] -= 1;
-    // catch_sheep(wolve, sheep, &newX, &newY, t+1, t+1);
+    wolve[newX + newY*half][t + 1] -= 1;
+    catch_sheep(wolve, sheep, &newX, &newY, t+1, t+1);
     death(wolve, newX, newY, t+1, 1);
     reproduce(wolve, newX, newY, t+1, 0);
 }
@@ -237,9 +261,9 @@ int main(void)
         // printf("wolve = %d\n", tot_wolve);
         for (int i = 0; i < N; i++)
         {
-            printf("t,i %d, %d, sheep value %f\n", t,i, sheep[i][t]);
+            // printf("t,i %d, %d, sheep value %f\n", t,i, sheep[i][t]);
             ask_sheep(sheep, i, t);
-    //             // ask_wolve(wolve, sheep, i, t);
+            ask_wolve(wolve, sheep, i, t);
     //             // if (Grass == 1)
     //             //     ask_patch(grass,i,t)
                 
@@ -247,6 +271,6 @@ int main(void)
     }
 
     mat2hdf5(sheep);
-    // mat2hdf5(wolve);
+    mat2hdf5w(wolve);
     return 0;
 }
