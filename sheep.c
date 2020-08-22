@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #define FILE "sheep.h5"
 #define FILEw "wolve.h5"
+#define FILEg "grass.h5"
 #define DATASET "DS1"
 #define N 25
 #define T 100
@@ -13,14 +14,16 @@
 #define initWolveNum 4
 #define wolveGainFromFood 20
 #define wolveReproduce 5 //%
-#define Grass 0
-#define initGrass 15
+#define Grass 1
+#define initGrass 25
+#define grassRegrowth 50 //%
 #define max(a, b) ({ __typeof__ (a) _a = (a); __typeof__ (b) _b = (b); _a > _b ? _a : _b; })
 #define error 0.00001
 
 int half = sqrt(N);
 int tot_sheep=0;
-int tot_wolve=0;
+int tot_wolve = 0;
+int tot_grass = 0;
 
 int mat2hdf5(double wdata[N][T], char *filename) 
 // int mat2hdf5(double **wdata, char *filename)
@@ -34,6 +37,25 @@ int mat2hdf5(double wdata[N][T], char *filename)
     dset = H5Dcreate(file, DATASET, H5T_IEEE_F64LE, space, H5P_DEFAULT,
                      H5P_DEFAULT, H5P_DEFAULT);
     status = H5Dwrite(dset, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT,
+                      wdata[0]);
+    status = H5Dclose(dset);
+    status = H5Sclose(space);
+    status = H5Fclose(file);
+
+    return 0;
+}
+int mat2hdf5int(int wdata[N][T], char *filename)
+// int mat2hdf5(double **wdata, char *filename)
+{
+    hid_t file, space, dset; /* Handles */
+    herr_t status;
+    hsize_t dims[2] = {N, T};
+
+    file = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+    space = H5Screate_simple(2, dims, NULL);
+    dset = H5Dcreate(file, DATASET, H5T_IEEE_F64LE, space, H5P_DEFAULT,
+                     H5P_DEFAULT, H5P_DEFAULT);
+    status = H5Dwrite(dset, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT,
                       wdata[0]);
     status = H5Dclose(dset);
     status = H5Sclose(space);
@@ -170,8 +192,8 @@ void reproduce(double animal[N][T], int curX, int curY, int t, int flag)
     }
 }
 
-void init_sheep_wolve(double sheep[N][T], double wolve[N][T]) 
-// void init_sheep_wolve(double **sheep, double **wolve)
+void init_sheep_wolve(double sheep[N][T], double wolve[N][T], int grass[N][T])
+// void init_sheep_wolve(double **sheep, double **wolve, double **grass)
 {
     int sheepNum = 0;
     while (sheepNum < initSheepNum){
@@ -194,16 +216,20 @@ void init_sheep_wolve(double sheep[N][T], double wolve[N][T])
             tot_wolve++;
         }
     }
-
-    int wolveNum = 0;
-    while (wolveNum < initWolveNum)
-    {
-        int randint = (float)rand() / (float)(RAND_MAX) * (N - 1);
-        if (wolve[randint][0] < error)
+    if (Grass == 0){
+        for (int i =0; i<N; i++)
+            grass[i][0] = 1;
+    }else{
+        int grassNum = 0;
+        while (grassNum < initGrass)
         {
-            wolve[randint][0] = max(1.0, 2 * wolveGainFromFood * (float)rand() / (float)(RAND_MAX));
-            wolveNum++;
-            tot_wolve++;
+            int randint = (float)rand() / (float)(RAND_MAX) * (N - 1);
+            if (grass[randint][0] < error)
+            {
+                grass[randint][0] = 1;
+                grassNum++;
+                tot_grass++;
+            }
         }
     }
 }
@@ -246,18 +272,44 @@ void catch_sheep(double wolve[N][T], double sheep[N][T], int *curX, int *curY, i
         wolve[idx][tw] += wolveGainFromFood;
     }
 }
+void eatgrass(double sheep[N][T], int grass[N][T], int i, int t)
+{
+    // t+1 sheep eat t grass
+    if (grass[i][t]>0){
+        sheep[i][t + 1] += sheepGainFromFood;
+        grass[i][t] = 0;
+    }
+}
 
-void ask_sheep(double sheep[N][T], int i, int t){
-// void ask_sheep(double** sheep, int i, int t){
+void ask_patch(int grass[N][T], int i, int t)
+{
+    if (grass[i][t]==1){
+        grass[i][t + 1] = 1;
+    }
+    else{
+        float randint = (float)rand() / (float)(RAND_MAX)*100;
+        if (randint < (float)grassRegrowth)
+            grass[i][t+1] = 1;
+        else
+            grass[i][t + 1] = 0;
+    }
+}
+
+void ask_sheep(double sheep[N][T], int grass[N][T], int i, int t)
+{
+    // void ask_sheep(double** sheep,double** grass, int i, int t){
     if (sheep[i][t] < error)
         return;
     int curY = i / half;
     int curX = i - curY * half;
     int newX, newY;
     move(sheep, curX, curY, t, t+1, &newX, &newY);
-    // if Grass == 1{
-    //     sheep[newX + newY * half][t] = sheep[newX + newY * half][t]-1
-    // }
+    if (Grass == 1) 
+    {
+        int newIdx = newX + newY * half;
+        sheep[newIdx][t+1]--;
+        eatgrass(sheep, grass, newIdx, t); // t+1 sheep eat t grass
+    }
     death(sheep, newX, newY, t+1, 0);
     reproduce(sheep, newX, newY, t+1, 0);
 }
@@ -286,7 +338,7 @@ int main(void)
     // }
     double sheep[N][T] = {0};
     double wolve[N][T] = {0};
-    double grass[N][T] = {0};
+    int grass[N][T] = {0};
 
     init_sheep_wolve(sheep, wolve, grass);
     // for (int t = 0; t < T; t++)
@@ -304,17 +356,17 @@ int main(void)
         //     // printf("wolve = %d\n", tot_wolve);
         for (int i = 0; i < N; i++)
         {
-            if (sheep[i][t] > 0)
-                // printf("t,i %d, %d, sheep value %f\n", t, i, sheep[i][t]);
-                    ask_sheep(sheep, i, t);
-                    ask_wolve(wolve, sheep, i, t);
-                    if (Grass == 1)
-                        ask_patch(grass,i,t)
+            // printf("t,i %d, %d, sheep value %f\n", t, i, sheep[i][t]);
+            ask_sheep(sheep, grass, i, t);
+            ask_wolve(wolve, sheep, i, t);
+            if (Grass == 1)
+                ask_patch(grass, i, t);
         }
     }
 
     mat2hdf5(sheep, FILE);
     mat2hdf5(wolve, FILEw);
+    mat2hdf5int(grass, FILEg);
 
     // for (int i = 0; i < N; i++)
     // {
