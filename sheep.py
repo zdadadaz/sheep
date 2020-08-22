@@ -5,16 +5,20 @@ import math
 
 FILEs = "sheep.h5"
 FILEw = "wolve.h5"
+FILEg = "grass.h5"
 DATASET = "DS1"
 
 error = 0.0001
 hfs = h5py.File(FILEs, 'r')
 hfw = h5py.File(FILEw, 'r')
+hfg = h5py.File(FILEg, 'r')
 sheep = hfs[DATASET]
 wolve = hfw[DATASET]
+grass = hfg[DATASET]
 sheep = np.array(sheep)
 wolve = np.array(wolve)
-grass = np.zeros_like(wolve)
+grass = np.array(grass)
+# grass = np.zeros_like(wolve)
 
 N, T = sheep.shape
 grid_size = int(np.sqrt(N))
@@ -29,6 +33,7 @@ plt.figure(3)
 xx = []
 yys = []
 yyw = []
+yyg = []
 for t in range(0,T):
     counts = 0
     countw = 0
@@ -47,10 +52,11 @@ for t in range(0,T):
             countw += 1
             marker[i] = plt.scatter(x, y, color='red', alpha=1, s=10**2)
             plt.annotate(round(wolve[i,t]), (x, y))
-        if grass[i,t] > error:
+        if grass[i,t] > 0:
             countg += 1
-            marker[i] = plt.scatter(x, y, color='green', alpha=1, s=10**2,marker='s')
-            plt.annotate(round(wolve[i,t]), (x, y))
+            marker[i] = plt.scatter(x, y, color='green', alpha=0.3, s=10**2,marker='s')
+        else:
+            marker[i] = plt.scatter(x, y, color='gray', alpha=0.3, s=10**2,marker='s')
     plt.xlim(-1, grid_size)
     plt.ylim(-1, grid_size)
     plt.grid(b=True, which='major', color='k', linestyle='--',alpha=0.1)
@@ -58,8 +64,10 @@ for t in range(0,T):
     
     yys.append(counts)
     yyw.append(countw)
+    yyg.append(countg)
     ax.plot(xx,yys,color='b')
     ax.plot(xx,yyw,color='r')
+    ax.plot(xx,yyg,color='g')
     ax.set_xlim(-1, T)
     ax.set_ylim(-1, N)
     ax.grid(b=True, which='major', color='k', linestyle='--',alpha=0.1)
