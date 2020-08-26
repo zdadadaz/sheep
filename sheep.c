@@ -6,7 +6,7 @@
 #define FILEw "wolve.h5"
 #define FILEg "grass.h5"
 #define DATASET "DS1"
-#define N 25
+#define N 100
 #define T 100
 #define initSheepNum 10
 #define sheepGainFromFood 4
