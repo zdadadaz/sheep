@@ -4,20 +4,17 @@
 #include <stdbool.h>
 #include <assert.h>
 #include <time.h>
-#define FILE "sheep.h5"
-#define FILEw "wolve.h5"
-#define FILEg "grass.h5"
-#define DATASET "DS1"
-#define N 250000
+#define FILE "animal.h5"
+#define N 25
 #define T 100
-#define initSheepNum 50
+#define initSheepNum 10
 #define sheepGainFromFood 4
 #define sheepReproduce 4 //%
-#define initWolveNum 50
+#define initWolveNum 5
 #define wolveGainFromFood 5
 #define wolveReproduce 5 //%
 #define Grass 1
-#define initGrass 100
+#define initGrass 20
 #define grassRegrowth 10 //time
 #define max(a, b) ({ __typeof__ (a) _a = (a); __typeof__ (b) _b = (b); _a > _b ? _a : _b; })
 #define min(a, b) ({ __typeof__ (a) _a = (a); __typeof__ (b) _b = (b); _a < _b ? _a : _b; })
@@ -30,51 +27,33 @@ int tot_sheep=0;
 int tot_wolve = 0;
 int tot_grass = 0;
 
-#ifdef dymatrix
-int mat2hdf5(double** wdata, char *filename) 
-#else
-int mat2hdf5(double wdata[N][T], char *filename)
-#endif
+int mat2hdf5(double *sdata, double *wdata, int *gdata, char *filename)
 {
-    hid_t file, space, dset; /* Handles */
+    hid_t file, space, dsets, dsetw, dsetg; /* Handles */
     herr_t status;
-    hsize_t dims[2] = {N, T};
+    hsize_t dims[1] = {N*T};
 
+    char DATASETs[20] = "Ds_sheep";
+    char DATASETw[20] = "Ds_wolve";
+    char DATASETg[20] = "Ds_grass";
     file = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
-    space = H5Screate_simple(2, dims, NULL);
-    dset = H5Dcreate(file, DATASET, H5T_IEEE_F64LE, space, H5P_DEFAULT,
-                     H5P_DEFAULT, H5P_DEFAULT);
-    status = H5Dwrite(dset, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT,
-                      wdata[0]);
-    status = H5Dclose(dset);
+    space = H5Screate_simple(1, dims, NULL);
+    dsets = H5Dcreate(file, DATASETs, H5T_IEEE_F64LE, space, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    dsetw = H5Dcreate(file, DATASETw, H5T_IEEE_F64LE, space, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    dsetg = H5Dcreate(file, DATASETg, H5T_STD_I64BE, space, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+
+    status = H5Dwrite(dsets, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, sdata);
+    status = H5Dwrite(dsetw, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, wdata);
+    status = H5Dwrite(dsetg, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, gdata);
+
+    status = H5Dclose(dsets);
+    status = H5Dclose(dsetw);
+    status = H5Dclose(dsetg);
     status = H5Sclose(space);
     status = H5Fclose(file);
 
     return 0;
 }
-#ifdef dymatrix
-int mat2hdf5int(int** wdata, char *filename) 
-#else
-int mat2hdf5int(int wdata[N][T], char *filename)
-#endif
-{
-    hid_t file, space, dset; /* Handles */
-    herr_t status;
-    hsize_t dims[2] = {N, T};
-
-    file = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
-    space = H5Screate_simple(2, dims, NULL);
-    dset = H5Dcreate(file, DATASET, H5T_IEEE_F64LE, space, H5P_DEFAULT,
-                     H5P_DEFAULT, H5P_DEFAULT);
-    status = H5Dwrite(dset, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT,
-                      wdata[0]);
-    status = H5Dclose(dset);
-    status = H5Sclose(space);
-    status = H5Fclose(file);
-
-    return 0;
-}
-
 void gen_surroundxy(int curX, int curY, int xlist[8], int ylist[8]){
     int xl[8] = {-1, -1 ,0 ,1, 1,1,0,-1};
     int yl[8] = {0  ,-1,-1,-1, 0,1,1, 1};
@@ -364,13 +343,14 @@ void ask_wolve(double wolve[N], double sheep[N], int i)
     reproduce(wolve, newX, newY, 1);
 }
 #ifdef dymatrix
-void save2mat(double **matTime, double *mat, int t, bool *fmat)
+void save2mat(double *matTime, double *mat, int t, bool *fmat)
 #else
 void save2mat(double matTime[N][T], double mat[N], int t, bool* fmat)
 #endif
 {
+    int base = N * t;
     for (int i = 0; i < N; i++){
-        matTime[i][t] = mat[i];
+        matTime[i + base] = mat[i];
         if (mat[i] > error)
             fmat[i] = true;
         else
@@ -378,15 +358,14 @@ void save2mat(double matTime[N][T], double mat[N], int t, bool* fmat)
     }
 }
 #ifdef dymatrix
-void save2matInt(int** matTime, int* mat, int t)
+void save2matInt(int* matTime, int* mat, int t)
 #else
 void save2matInt(int matTime[N][T], int mat[N], int t)
 #endif
 {
+    int base = N * t;
     for (int i = 0; i < N; i++)
-    {
-        matTime[i][t] = mat[i];
-    }
+        matTime[i + base] = mat[i];
 }
 
 int main(void)
@@ -398,16 +377,11 @@ int main(void)
     assert(initGrass <= N && "grass init number should be smaller than N");
 
 #ifdef dymatrix
-    double **sheep = malloc(N * sizeof(double *));
-    double **wolve = malloc(N * sizeof(double *));
-    int **grass = malloc(N * sizeof(double *));
-    for (int i = 0; i < N; i++){
-        sheep[i] = malloc(T * sizeof(double));
-        wolve[i] = malloc(T * sizeof(double));
-        grass[i] = malloc(T * sizeof(int));
-    }
-    double* curSheep = malloc(N * sizeof(double));
-    double* curWolve = malloc(N * sizeof(double));
+    double *sheep = malloc(N * T * sizeof(double));
+    double *wolve = malloc(N * T * sizeof(double));
+    int *grass = malloc(N * T * sizeof(int));
+    double *curSheep = malloc(N * sizeof(double));
+    double *curWolve = malloc(N * sizeof(double));
     int* curGrass = malloc(N * sizeof(int));
 
 #else
@@ -423,13 +397,7 @@ int main(void)
     bool *fwolve = malloc(N * sizeof(bool));
 
     init_sheep_wolve(curSheep, curWolve, curGrass);
-    // testing for all 1 case
-    // for (int i = 0; i < N; i++)
-    // {
-    //     curSheep[i] = 1;
-    //     curWolve[i] = 1;
-    //     curGrass[i] = 1;
-    // }
+    
     save2mat(sheep, curSheep, 0, fsheep);
     save2mat(wolve, curWolve, 0, fwolve);
     save2matInt(grass, curGrass, 0);
@@ -458,7 +426,7 @@ int main(void)
                 acc_w++;
                 // printf("wolf %f, ", curWolve[i]);
             }
-                
+
             if (curSheep[i] > 0)
                 acc_s++;
             if (curGrass[i] > 0)
@@ -472,35 +440,29 @@ int main(void)
             printf("g %d,%d,%d\n", curGrass_tot, tot_grass, acc_g);
             printf("\n");
         }
-        // else
-        //     printf("t %d, s %d, w %d, g %d\n", t, tot_sheep, tot_wolve, tot_grass);
-
+        else
+            printf("t %d, s %d, w %d, g %d\n", t, tot_sheep, tot_wolve, tot_grass);
+        printf("%u", clock());
         save2mat(sheep, curSheep, t, fsheep);
         save2mat(wolve, curWolve, t, fwolve);
         save2matInt(grass, curGrass, t);
     }
 
-    mat2hdf5(sheep, FILE);
-    mat2hdf5(wolve, FILEw);
-    mat2hdf5int(grass, FILEg);
-
+    mat2hdf5(sheep,wolve,grass, FILE);
     end_t = clock();
     total_t = (double)(end_t - start_t) / CLOCKS_PER_SEC;
-    printf("End of program total_t = %f\n", total_t);
+    printf("End of program total_t = %u, %u, %u, %u\n", total_t, end_t, start_t, CLOCKS_PER_SEC);
 
 #ifdef dymatrix
-    for (int i = 0; i < N; i++)
-    {
-        free(sheep[i]);
-        free(wolve[i]);
-        free(grass[i]);
-    }
     free(sheep);
     free(grass);
     free(wolve);
+    free(curSheep);
+    free(curWolve);
+    free(curGrass);
 #endif
     free(fsheep);
     free(fwolve);
 
     return 0;
-}
+    }

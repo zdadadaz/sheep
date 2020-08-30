@@ -4,7 +4,7 @@ LIBRARY_DIRS = ~/usr/lib
 INCLUDE_DIRS = ~/usr/include
 
 output:
-	gcc sheep.c -I$(INCLUDE_DIRS) -L$(LIBRARY_DIRS) -lhdf5 -std=gnu99 -o sheep
+	gcc sheep_v2.c -I$(INCLUDE_DIRS) -L$(LIBRARY_DIRS) -lhdf5 -std=gnu99 -o sheep -pg -g 
 
 clean:
 	rm sheep
