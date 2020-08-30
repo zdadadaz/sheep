@@ -3,37 +3,34 @@ import h5py
 import matplotlib.pyplot as plt
 import math
 
-FILEs = "sheep.h5"
-FILEw = "wolve.h5"
-FILEg = "grass.h5"
-DATASET = "DS1"
-
-error = 0.0001
-hfs = h5py.File(FILEs, 'r')
-hfw = h5py.File(FILEw, 'r')
-hfg = h5py.File(FILEg, 'r')
-sheep = hfs[DATASET]
-wolve = hfw[DATASET]
-grass = hfg[DATASET]
+N = 25
+T = 100
+FILE = "animal.h5"
+DATASETs = "Ds_sheep"
+DATASETw = "Ds_wolve"
+DATASETg = "Ds_grass"
+error = 0
+hf = h5py.File(FILE, 'r')
+sheep = hf[DATASETs]
+wolve = hf[DATASETw]
+grass = hf[DATASETg]
 sheep = np.array(sheep)
 wolve = np.array(wolve)
 grass = np.array(grass)
-# grass = np.zeros_like(wolve)
 
-N, T = sheep.shape
 grid_size = int(np.sqrt(N))
-t=1
 half = math.sqrt(N)
 
 plt.rcParams['animation.html'] = 'jshtml'
 fig2 = plt.figure(2)
 ax=fig2.add_subplot(111)
 plt.figure(3)
-# print(sheep[:][1].sum())
 xx = []
 yys = []
 yyw = []
 yyg = []
+
+print(np.all(sheep==1))
 for t in range(0,T):
     counts = 0
     countw = 0
@@ -41,18 +38,19 @@ for t in range(0,T):
     xx.append(t)
     
     marker = [0]*N 
+    base = t*N
     for i in range(N):
         y = i//half
         x = i - y*half
-        if sheep[i,t] > error:
+        if sheep[i+base] > error:
             counts += 1
             marker[i] = plt.scatter(x, y, color='blue', alpha=1, s=10**2)
-            plt.annotate(round(sheep[i,t]), (x, y))
-        if wolve[i,t] > error:
+            plt.annotate(round(sheep[i+base],2), (x, y))
+        if wolve[i+base] > error:
             countw += 1
             marker[i] = plt.scatter(x, y, color='red', alpha=1, s=10**2)
-            plt.annotate(round(wolve[i,t]), (x, y))
-        if grass[i,t] > 0:
+            plt.annotate(round(wolve[i+base],2), (x, y))
+        if grass[i+base] > 0:
             countg += 1
             marker[i] = plt.scatter(x, y, color='green', alpha=0.3, s=10**2,marker='s')
         else:
