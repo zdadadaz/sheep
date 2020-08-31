@@ -6,7 +6,7 @@
 #include <time.h>
 #define FILE "animal.h5"
 #define N 2500
-#define T 100
+#define T 300
 #define initSheepNum 100
 #define sheepGainFromFood 4
 #define sheepReproduce 4 //%
@@ -14,7 +14,7 @@
 #define wolveGainFromFood 20
 #define wolveReproduce 5 //%
 #define Grass 1
-#define initGrass 1200
+#define initGrass 1500
 #define grassRegrowth 30 //time
 #define max(a, b) ({ __typeof__ (a) _a = (a); __typeof__ (b) _b = (b); _a > _b ? _a : _b; })
 #define min(a, b) ({ __typeof__ (a) _a = (a); __typeof__ (b) _b = (b); _a < _b ? _a : _b; })
@@ -26,10 +26,11 @@ int tot_sheep=0;
 int tot_wolve = 0;
 int tot_grass = 0;
 
-int mat2hdf5(double *sdata, double *wdata, int *gdata, int* count, char *filename)
+int mat2hdf5(double *sdata, double *wdata, int *gdata, int *count, int *setting, char *filename)
 {
-    hid_t file, space, space_c, dsets, dsetw, dsetg, dsetc; /* Handles */
+    hid_t file, space, space_c, space_set, dsets, dsetw, dsetg, dsetc, dsetset; /* Handles */
     herr_t status;
+    hsize_t dimset[1] = {2};
     hsize_t dims[1] = {N * T};
     hsize_t dims_count[1] = {3 * T};
 
@@ -37,23 +38,31 @@ int mat2hdf5(double *sdata, double *wdata, int *gdata, int* count, char *filenam
     char DATASETw[20] = "Ds_wolve";
     char DATASETg[20] = "Ds_grass";
     char DATASETc[20] = "Ds_count";
+    char DATASETset[20] = "Ds_set";
+
     file = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
     space = H5Screate_simple(1, dims, NULL);
     space_c = H5Screate_simple(1, dims_count, NULL);
+    space_set = H5Screate_simple(1, dimset, NULL);
     dsets = H5Dcreate(file, DATASETs, H5T_IEEE_F64LE, space, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     dsetw = H5Dcreate(file, DATASETw, H5T_IEEE_F64LE, space, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     dsetg = H5Dcreate(file, DATASETg, H5T_STD_I64BE, space, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     dsetc = H5Dcreate(file, DATASETc, H5T_STD_I64BE, space_c, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    dsetset = H5Dcreate(file, DATASETset, H5T_STD_I64BE, space_set, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
 
     status = H5Dwrite(dsets, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, sdata);
     status = H5Dwrite(dsetw, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, wdata);
     status = H5Dwrite(dsetg, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, gdata);
     status = H5Dwrite(dsetc, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, count);
+    status = H5Dwrite(dsetset, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, setting);
 
     status = H5Dclose(dsets);
     status = H5Dclose(dsetw);
     status = H5Dclose(dsetg);
+    status = H5Dclose(dsetset);
     status = H5Sclose(space);
+    status = H5Sclose(space_c);
+    status = H5Sclose(space_set);
     status = H5Fclose(file);
 
     return 0;
@@ -338,9 +347,12 @@ int main(void)
     double *curSheep = malloc(N * sizeof(double));
     double *curWolve = malloc(N * sizeof(double));
     int *curGrass = malloc(N * sizeof(int));
-    int *animalNum = malloc(3*T * sizeof(int));
+    int *animalNum = malloc(3 * T * sizeof(int));
+    int *setting = malloc(2 * sizeof(int));
     for (int i = 0 ; i < 3*T; i++)
         animalNum[i] = 0;
+    setting[0] = N;
+    setting[1] = T;
 
     bool *fsheep = malloc(N * sizeof(bool));
     bool *fwolve = malloc(N * sizeof(bool));
@@ -372,18 +384,18 @@ int main(void)
         int acc_s = 0;
         int acc_w = 0;
         int acc_g = 0;
-        for (int i = 0; i < N; i++)
-        {
-            if (curWolve[i] > 0){
-                acc_w++;
-                // printf("wolf %f, ", curWolve[i]);
-            }
+        // for (int i = 0; i < N; i++)
+        // {
+        //     if (curWolve[i] > 0){
+        //         acc_w++;
+        //         // printf("wolf %f, ", curWolve[i]);
+        //     }
 
-            if (curSheep[i] > 0)
-                acc_s++;
-            if (curGrass[i] > 0)
-                acc_g++;
-        }
+        //     if (curSheep[i] > 0)
+        //         acc_s++;
+        //     if (curGrass[i] > 0)
+        //         acc_g++;
+        // }
         animalNum[0 + t * 3] = tot_sheep;
         animalNum[1 + t * 3] = tot_wolve;
         animalNum[2 + t * 3] = tot_grass;
@@ -397,15 +409,14 @@ int main(void)
         }
         else
             printf("t %d, s %d, w %d, g %d\n", t, tot_sheep, tot_wolve, tot_grass);
-        printf("%u", clock());
         save2mat(sheep, curSheep, t, fsheep);
         save2mat(wolve, curWolve, t, fwolve);
         save2matInt(grass, curGrass, t);
     }
 
-    mat2hdf5(sheep, wolve, grass, animalNum, FILE);
+    mat2hdf5(sheep, wolve, grass, animalNum,setting, FILE);
     end_t = clock();
-    total_t = (double)(end_t - start_t) / CLOCKS_PER_SEC;
+    total_t = (double)(end_t - start_t) / (double)CLOCKS_PER_SEC;
     printf("End of program total_t = %u, %u, %u, %u\n", total_t, end_t, start_t, CLOCKS_PER_SEC);
 
     free(sheep);
@@ -417,6 +428,7 @@ int main(void)
     free(fsheep);
     free(fwolve);
     free(animalNum);
+    free(setting);
 
     return 0;
     }

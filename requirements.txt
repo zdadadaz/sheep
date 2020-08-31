@@ -1,0 +1,4 @@
+h5py==2.10.0
+numpy==1.18.1
+opencv-python==3.4.2.16
+cmake

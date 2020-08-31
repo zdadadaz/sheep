@@ -9,16 +9,19 @@ def read_hdf(path):
     DATASETw = "Ds_wolve"
     DATASETg = "Ds_grass"
     DATASETc = "Ds_count"
+    DATASETset = "Ds_set"
     hf = h5py.File(path, 'r')
     sheep = hf[DATASETs]
     wolve = hf[DATASETw]
     grass = hf[DATASETg]
     count = hf[DATASETc]
+    setting = hf[DATASETset]
     sheep = np.array(sheep)
     wolve = np.array(wolve)
     grass = np.array(grass)
     count = np.array(count)
-    return (sheep, wolve, grass,count)
+    setting = np.array(setting)
+    return (sheep, wolve, grass, count, setting)
 
 def readimg(path):
     sheep_im = cv2.imread(path)
