@@ -53,7 +53,7 @@ int mat2hdf5int(int wdata[N][T], char *filename)
 
     file = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
     space = H5Screate_simple(2, dims, NULL);
-    dset = H5Dcreate(file, DATASET, H5T_IEEE_F64LE, space, H5P_DEFAULT,
+    dset = H5Dcreate(file, DATASET, H5T_STD_I64BE, space, H5P_DEFAULT,
                      H5P_DEFAULT, H5P_DEFAULT);
     status = H5Dwrite(dset, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT,
                       wdata[0]);
