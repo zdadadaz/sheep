@@ -5,46 +5,50 @@
 #include <assert.h>
 #include <time.h>
 #define FILE "animal.h5"
-#define N 25
+#define N 2500
 #define T 100
-#define initSheepNum 10
+#define initSheepNum 100
 #define sheepGainFromFood 4
 #define sheepReproduce 4 //%
-#define initWolveNum 5
-#define wolveGainFromFood 5
+#define initWolveNum 50
+#define wolveGainFromFood 20
 #define wolveReproduce 5 //%
 #define Grass 1
-#define initGrass 20
-#define grassRegrowth 10 //time
+#define initGrass 1200
+#define grassRegrowth 30 //time
 #define max(a, b) ({ __typeof__ (a) _a = (a); __typeof__ (b) _b = (b); _a > _b ? _a : _b; })
 #define min(a, b) ({ __typeof__ (a) _a = (a); __typeof__ (b) _b = (b); _a < _b ? _a : _b; })
 #define error 0.00001
 #define debug 0
-#define dymatrix
 
 int half = sqrt(N);
 int tot_sheep=0;
 int tot_wolve = 0;
 int tot_grass = 0;
 
-int mat2hdf5(double *sdata, double *wdata, int *gdata, char *filename)
+int mat2hdf5(double *sdata, double *wdata, int *gdata, int* count, char *filename)
 {
-    hid_t file, space, dsets, dsetw, dsetg; /* Handles */
+    hid_t file, space, space_c, dsets, dsetw, dsetg, dsetc; /* Handles */
     herr_t status;
-    hsize_t dims[1] = {N*T};
+    hsize_t dims[1] = {N * T};
+    hsize_t dims_count[1] = {3 * T};
 
     char DATASETs[20] = "Ds_sheep";
     char DATASETw[20] = "Ds_wolve";
     char DATASETg[20] = "Ds_grass";
+    char DATASETc[20] = "Ds_count";
     file = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
     space = H5Screate_simple(1, dims, NULL);
+    space_c = H5Screate_simple(1, dims_count, NULL);
     dsets = H5Dcreate(file, DATASETs, H5T_IEEE_F64LE, space, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     dsetw = H5Dcreate(file, DATASETw, H5T_IEEE_F64LE, space, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     dsetg = H5Dcreate(file, DATASETg, H5T_STD_I64BE, space, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    dsetc = H5Dcreate(file, DATASETc, H5T_STD_I64BE, space_c, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
 
     status = H5Dwrite(dsets, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, sdata);
     status = H5Dwrite(dsetw, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, wdata);
     status = H5Dwrite(dsetg, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, gdata);
+    status = H5Dwrite(dsetc, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, count);
 
     status = H5Dclose(dsets);
     status = H5Dclose(dsetw);
@@ -62,21 +66,13 @@ void gen_surroundxy(int curX, int curY, int xlist[8], int ylist[8]){
         ylist[i] = curY + yl[i];
     }
 }
-#ifdef dymatrix
 bool check_sheep_exist(double* animal, int x, int y) 
-#else
-bool check_sheep_exist(double animal[N], int x, int y) 
-#endif
 {
     if ((x >= 0) && (x < half) && (y >= 0) && (y < half) && animal[x + y * half] > error)
         return true;
     return false;
 }
-#ifdef dymatrix
 void move(double* animal, int curX, int curY, int *newX, int *newY) 
-#else
-void move(double animal[N], int curX, int curY, int *newX, int *newY) 
-#endif
 {
     int flag = false;
     int tmpX = curX, tmpY = curY;
@@ -109,11 +105,7 @@ void move(double animal[N], int curX, int curY, int *newX, int *newY)
     }
     
 }
-#ifdef dymatrix
 void death(double* animal, int curX, int curY, int flag)
-#else
-void death(double animal[N], int curX, int curY, int flag)
-#endif
 {
     if (animal[curX + curY * half] <= error)
     {
@@ -131,11 +123,7 @@ void death(double animal[N], int curX, int curY, int flag)
         }
     }
 }
-#ifdef dymatrix
 void create_animal(double* animal, int curX, int curY, int flag)
-#else
-void create_animal(double animal[N], int curX, int curY, int flag)
-#endif
 {
     int gainFood = flag == 0 ? sheepGainFromFood : wolveGainFromFood;
     int Energy = max(1.0, 2 * gainFood * (float)rand() / (float)(RAND_MAX));
@@ -167,11 +155,7 @@ void create_animal(double animal[N], int curX, int curY, int flag)
     //     printf("no place for reproduce flag %d\n",flag);
     // }
 }
-#ifdef dymatrix
 void reproduce(double* animal, int curX, int curY, int flag) 
-#else
-void reproduce(double animal[N], int curX, int curY, int flag) 
-#endif
 {
     float randint = (float)rand() / (float)(RAND_MAX)*100;
     int cond_reproduce_rate = (flag == 0) ? sheepReproduce : wolveReproduce;
@@ -180,11 +164,7 @@ void reproduce(double animal[N], int curX, int curY, int flag)
         create_animal(animal, curX, curY,flag);
     }
 }
-#ifdef dymatrix
 void init_sheep_wolve(double* sheep, double* wolve, int* grass)
-#else
-void init_sheep_wolve(double sheep[N], double wolve[N], int grass[N])
-#endif
 {
     int sheepNum = 0;
     while (sheepNum < initSheepNum){
@@ -210,9 +190,10 @@ void init_sheep_wolve(double sheep[N], double wolve[N], int grass[N])
     if (Grass == 0){
         for (int i =0; i<N; i++)
             grass[i] = 1;
+        tot_grass = N;
     }else{
         for (int i = 0; i < N; i++)
-            grass[i] = (-1) * grassRegrowth;
+            grass[i] = (-1) * max(2.0, grassRegrowth * (float)rand() / (float)(RAND_MAX) * (N - 1));
         int grassNum = 0;
         while (grassNum < initGrass)
         {
@@ -226,65 +207,59 @@ void init_sheep_wolve(double sheep[N], double wolve[N], int grass[N])
         }
     }
 }
-#ifdef dymatrix
 void catch_sheep(double* wolve, double* sheep, int *curX, int *curY) 
-#else
-void catch_sheep(double wolve[N], double sheep[N], int *curX, int *curY) 
-#endif
 {
     int count = 0;
     int xlist[9] = {0}, ylist[9] = {0};
     int count_list[9] = {0};
     int idx = (*curX) + (*curY) * half;
 
+    if (sheep[idx] > error)
+    {
+        sheep[idx] = 0; //kill
+        tot_sheep--;
+        wolve[idx] += wolveGainFromFood;
+        if (debug == 1)
+            printf("kill one sheep\n");
+    }
+    
+    // gen_surroundxy(*curX, *curY, xlist, ylist);
+    // for (int i = 0; i < 8; i++)
+    // {
+    //     bool check = check_sheep_exist(sheep, xlist[i], ylist[i]);
+    //     if (check == true)
+    //     {
+    //         count_list[i] = 1;
+    //         count++;
+    //     }
+    // }
     // if (sheep[idx] > error)
     // {
-    //     sheep[idx] = 0; //kill
+    //     xlist[8] = (*curX);
+    //     ylist[8] = (*curY);
+    //     count_list[8] = 1;
+    //     count++;
+    // }
+    // if (count > 0)
+    // {
+    //     // int randint = (float)rand() / (float)(RAND_MAX) * (count - 1);
+    //     int randint = 8;
+    //     for (int i = 8; i >= 0; i--)
+    //     {
+    //         if (count_list[i] > 0)
+    //         {
+    //             randint = i;
+    //             break;
+    //         }
+    //     }
+    //     sheep[xlist[randint] + half * ylist[randint]] = 0; //kill
+    //     if (debug == 1)
+    //         printf("kill one sheep\n");
     //     tot_sheep--;
     //     wolve[idx] += wolveGainFromFood;
     // }
-    
-    gen_surroundxy(*curX, *curY, xlist, ylist);
-    for (int i = 0; i < 8; i++)
-    {
-        bool check = check_sheep_exist(sheep, xlist[i], ylist[i]);
-        if (check == true)
-        {
-            count_list[i] = 1;
-            count++;
-        }
-    }
-    if (sheep[idx] > error)
-    {
-        xlist[8] = (*curX);
-        ylist[8] = (*curY);
-        count_list[8] = 1;
-        count++;
-    }
-    if (count > 0)
-    {
-        // int randint = (float)rand() / (float)(RAND_MAX) * (count - 1);
-        int randint = 8;
-        for (int i = 8; i >= 0; i--)
-        {
-            if (count_list[i] > 0)
-            {
-                randint = i;
-                break;
-            }
-        }
-        sheep[xlist[randint] + half * ylist[randint]] = 0; //kill
-        if (debug == 1)
-            printf("kill one sheep\n");
-        tot_sheep--;
-        wolve[idx] += wolveGainFromFood;
-    }
 }
-#ifdef dymatrix
 void eatgrass(double* sheep, int* grass, int i)
-#else
-void eatgrass(double sheep[N], int grass[N], int i)
-#endif
 {
     // t+1 sheep eat t grass
     if (grass[i]>0){
@@ -293,22 +268,14 @@ void eatgrass(double sheep[N], int grass[N], int i)
         tot_grass--;
     }
 }
-#ifdef dymatrix
 void ask_patch(int* grass, int i)
-#else
-void ask_patch(int grass[N], int i)
-#endif
 {
     if (grass[i]==0)
         tot_grass++;
     if (grass[i] < 1)
         grass[i]++;
 }
-#ifdef dymatrix
 void ask_sheep(double *sheep, int *grass, int i)
-#else
-void ask_sheep(double sheep[N], int grass[N], int i)
-#endif
 {
     if (sheep[i] < error)
         return;
@@ -325,11 +292,7 @@ void ask_sheep(double sheep[N], int grass[N], int i)
     death(sheep, newX, newY, 0);
     reproduce(sheep, newX, newY, 0);
 }
-#ifdef dymatrix
 void ask_wolve(double *wolve, double *sheep, int i)
-#else
-void ask_wolve(double wolve[N], double sheep[N], int i) 
-#endif
 {
     if (wolve[i] < error)
         return;
@@ -342,11 +305,7 @@ void ask_wolve(double wolve[N], double sheep[N], int i)
     death(wolve, newX, newY, 1);
     reproduce(wolve, newX, newY, 1);
 }
-#ifdef dymatrix
 void save2mat(double *matTime, double *mat, int t, bool *fmat)
-#else
-void save2mat(double matTime[N][T], double mat[N], int t, bool* fmat)
-#endif
 {
     int base = N * t;
     for (int i = 0; i < N; i++){
@@ -357,11 +316,7 @@ void save2mat(double matTime[N][T], double mat[N], int t, bool* fmat)
             fmat[i] = false;
     }
 }
-#ifdef dymatrix
 void save2matInt(int* matTime, int* mat, int t)
-#else
-void save2matInt(int matTime[N][T], int mat[N], int t)
-#endif
 {
     int base = N * t;
     for (int i = 0; i < N; i++)
@@ -372,32 +327,28 @@ int main(void)
 {
     clock_t start_t, end_t, total_t;
     start_t = clock();
+    assert(half * half == N && "N should be able to square root");
     assert(initSheepNum <= N && "sheep init number should be smaller than N");
     assert(initWolveNum <= N && "wolve init number should be smaller than N");
     assert(initGrass <= N && "grass init number should be smaller than N");
 
-#ifdef dymatrix
     double *sheep = malloc(N * T * sizeof(double));
     double *wolve = malloc(N * T * sizeof(double));
     int *grass = malloc(N * T * sizeof(int));
     double *curSheep = malloc(N * sizeof(double));
     double *curWolve = malloc(N * sizeof(double));
-    int* curGrass = malloc(N * sizeof(int));
+    int *curGrass = malloc(N * sizeof(int));
+    int *animalNum = malloc(3*T * sizeof(int));
+    for (int i = 0 ; i < 3*T; i++)
+        animalNum[i] = 0;
 
-#else
-    double sheep[N][T] = {0};
-    double wolve[N][T] = {0};
-    int grass[N][T] = {0};
-
-    double curSheep[N] = {0};
-    double curWolve[N] = {0};
-    int curGrass[N] = {0};
-#endif
     bool *fsheep = malloc(N * sizeof(bool));
     bool *fwolve = malloc(N * sizeof(bool));
 
     init_sheep_wolve(curSheep, curWolve, curGrass);
-    
+    animalNum[0] = tot_sheep;
+    animalNum[1] = tot_wolve;
+    animalNum[2] = tot_grass;
     save2mat(sheep, curSheep, 0, fsheep);
     save2mat(wolve, curWolve, 0, fwolve);
     save2matInt(grass, curGrass, 0);
@@ -410,8 +361,9 @@ int main(void)
 
         for (int i = 0; i < N; i++)
         {
-            if (fsheep[i] == true)
+            if (fsheep[i] == true){
                 ask_sheep(curSheep, curGrass, i);
+            }
             if (fwolve[i] == true)
                 ask_wolve(curWolve, curSheep, i);
             if (Grass == 1)
@@ -432,6 +384,9 @@ int main(void)
             if (curGrass[i] > 0)
                 acc_g++;
         }
+        animalNum[0 + t * 3] = tot_sheep;
+        animalNum[1 + t * 3] = tot_wolve;
+        animalNum[2 + t * 3] = tot_grass;
         // printf("\n");
         if (debug == 1){
             printf("t %d\n", t);
@@ -448,21 +403,20 @@ int main(void)
         save2matInt(grass, curGrass, t);
     }
 
-    mat2hdf5(sheep,wolve,grass, FILE);
+    mat2hdf5(sheep, wolve, grass, animalNum, FILE);
     end_t = clock();
     total_t = (double)(end_t - start_t) / CLOCKS_PER_SEC;
     printf("End of program total_t = %u, %u, %u, %u\n", total_t, end_t, start_t, CLOCKS_PER_SEC);
 
-#ifdef dymatrix
     free(sheep);
     free(grass);
     free(wolve);
     free(curSheep);
     free(curWolve);
     free(curGrass);
-#endif
     free(fsheep);
     free(fwolve);
+    free(animalNum);
 
     return 0;
     }

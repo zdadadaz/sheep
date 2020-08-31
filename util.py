@@ -24,6 +24,7 @@ def readimg(path):
     sheep_im = cv2.imread(path)
     sheep_im = cv2.cvtColor(sheep_im, cv2.COLOR_BGR2RGB).astype(int)
     return sheep_im
+
 def saveimg(path,sheep_im):
     sheep_im[sheep_im<0] = 0
     sheep_im[sheep_im>255] = 255
@@ -82,7 +83,7 @@ def write_video(array,filename,width,fps):
     for i in range(f):
         out.write(array[:, i, :, :].transpose((1, 2, 0)))
 
-def save_number_trend_plot(count,N, T,fps):
+def save_number_trend_plot(count,N, T,fps, filename):
     Writer = animation.writers['ffmpeg']
     writer = Writer(fps=fps, metadata=dict(artist='Me'), bitrate=1800)
     plt.rcParams['animation.html'] = 'jshtml'
@@ -108,4 +109,4 @@ def save_number_trend_plot(count,N, T,fps):
         ax.grid(b=True, which='major', color='k', linestyle='--',alpha=0.1)
         plt.grid()
     im_ani = animation.FuncAnimation(fig2, animate, interval=100)
-    im_ani.save('im.mp4', writer=writer)
+    im_ani.save(filename, writer=writer)

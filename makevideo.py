@@ -9,6 +9,8 @@ N = 2500
 T = 100
 outWidth = 1200
 fps =10
+plot_path = 'plot.mp4'
+visual_path = 'visual.avi'
 path = "./animal.h5"
 sheep_path = 'sheep.jpg'
 wolf_path = 'wolf.jpg'
@@ -24,7 +26,7 @@ sheep_im = preprocessing_img(sheep_path, step, 10)
 wolf_im = preprocessing_img(wolf_path, step, 2)
 
 # save number of plot
-save_number_trend_plot(count,N,T,fps)
+save_number_trend_plot(count,N,T,fps, plot_path)
 
 # save visualization
 canvas_v = np.zeros((T,outWidth,outWidth,3))
@@ -35,6 +37,6 @@ for t in range(T):
     canvas_v[t,...] = canvas
 
 canvas_v = canvas_v.astype(np.uint8)
-write_video(canvas_v.transpose((3,0,1,2)),"tmp.avi",outWidth, fps)
+write_video(canvas_v.transpose((3,0,1,2)),visual_path,outWidth, fps)
 
 
