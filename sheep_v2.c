@@ -381,26 +381,27 @@ int main(void)
             if (Grass == 1)
                 ask_patch(curGrass, i);
         }
-        int acc_s = 0;
-        int acc_w = 0;
-        int acc_g = 0;
-        // for (int i = 0; i < N; i++)
-        // {
-        //     if (curWolve[i] > 0){
-        //         acc_w++;
-        //         // printf("wolf %f, ", curWolve[i]);
-        //     }
-
-        //     if (curSheep[i] > 0)
-        //         acc_s++;
-        //     if (curGrass[i] > 0)
-        //         acc_g++;
-        // }
         animalNum[0 + t * 3] = tot_sheep;
         animalNum[1 + t * 3] = tot_wolve;
         animalNum[2 + t * 3] = tot_grass;
-        // printf("\n");
-        if (debug == 1){
+        if (debug == 1)
+        {
+            int acc_s = 0;
+            int acc_w = 0;
+            int acc_g = 0;
+            for (int i = 0; i < N; i++)
+            {
+                if (curWolve[i] > 0){
+                    acc_w++;
+                    // printf("wolf %f, ", curWolve[i]);
+                }
+
+                if (curSheep[i] > 0)
+                    acc_s++;
+                if (curGrass[i] > 0)
+                    acc_g++;
+            }
+            // printf("\n");
             printf("t %d\n", t);
             printf("s %d,%d,%d\n", curSheep_tot, tot_sheep, acc_s);
             printf("w %d,%d,%d\n", curWolve_tot, tot_wolve, acc_w);
