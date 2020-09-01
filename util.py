@@ -111,5 +111,5 @@ def save_number_trend_plot(count,N, T,fps, filename):
         ax.plot(xx[:i], np.array(yyg[:i])/4,color='g')
         ax.grid(b=True, which='major', color='k', linestyle='--',alpha=0.1)
         plt.grid()
-    im_ani = animation.FuncAnimation(fig2, animate, interval=100)
+    im_ani = animation.FuncAnimation(fig2, animate, interval=T)
     im_ani.save(filename, writer=writer)
