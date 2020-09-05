@@ -6,16 +6,16 @@
 #include <time.h>
 #include <math.h>
 #define FILE "animal.h5"
-#define N 100
-#define T 100
-#define initSheepNum 4//100
+#define N 2500
+#define T 1000
+#define initSheepNum 100
 #define sheepGainFromFood 4
 #define sheepReproduce 4 //%
-#define initWolveNum 2//50
+#define initWolveNum 50
 #define wolveGainFromFood 20
 #define wolveReproduce 5 //%
 #define Grass 1
-#define initGrass 48//1200
+#define initGrass 1200
 #define grassRegrowth 30 //time
 #define max(a, b) ({ __typeof__ (a) _a = (a); __typeof__ (b) _b = (b); _a > _b ? _a : _b; })
 #define min(a, b) ({ __typeof__ (a) _a = (a); __typeof__ (b) _b = (b); _a < _b ? _a : _b; })
