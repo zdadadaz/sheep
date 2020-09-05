@@ -1,1 +1,7 @@
 *.h5
+*.txt
+*.mp4
+*.avi
+*.png
+__pycache__/*
+*.out
