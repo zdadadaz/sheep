@@ -59,7 +59,7 @@ def draw_img(img, animal, x, y):
                 
 def draw_one_canvas(canvas, sheep, sheep_im,  wolf, wolf_im, grass, outWidth, step, half):
     green = np.zeros((step,step,3))
-    green[:,:,1] = np.ones((step,step))*255
+    green[:,:,1] = np.ones((step,step))*200
     brown = np.ones((step,step,3))
     brown[:,:,0] *= 150
     brown[:,:,1] *= 75
@@ -77,9 +77,6 @@ def draw_one_canvas(canvas, sheep, sheep_im,  wolf, wolf_im, grass, outWidth, st
             if wolf[idx*half + idj]>0:
                 draw_img(canvas, wolf_im, i, j)
 def write_video(array,filename,width,fps):
-    # writer = cv2.VideoWriter(path, cv2.VideoWriter_fourcc(*'PIM1'), 25, (width, width), False)
-    # for t in range(T):
-    #     writer.write(canvas[t,...])
     c, f, height, width = array.shape
     fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')
     out = cv2.VideoWriter(filename, fourcc, fps, (width, height))
