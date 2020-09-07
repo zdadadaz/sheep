@@ -100,6 +100,7 @@ def save_number_trend_plot(count,N, T,fps, filename):
         yyg.append(count[2 + t*3])
     def animate(i):
         ax.clear()
+        # print(i)
         ax.set_title('sheep: {}, wolf: {}, grass/4: {}'.format(yys[i],yyw[i],yyg[i]))
         ax.set_xlim(-1, T)
         ax.set_ylim(-1, N//4)
@@ -108,5 +109,5 @@ def save_number_trend_plot(count,N, T,fps, filename):
         ax.plot(xx[:i], np.array(yyg[:i])/4,color='g')
         ax.grid(b=True, which='major', color='k', linestyle='--',alpha=0.1)
         plt.grid()
-    im_ani = animation.FuncAnimation(fig2, animate, interval=T)
+    im_ani = animation.FuncAnimation(fig2, animate, interval=50,frames=T)
     im_ani.save(filename, writer=writer)
