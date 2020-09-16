@@ -4,8 +4,6 @@ import math
 import cv2
 import matplotlib.pyplot as plt
 
-
-
 outWidth = 1200
 fps =10
 plot_path = 'plot.mp4'
@@ -13,6 +11,8 @@ visual_path = 'visual'
 path = "./animal.h5"
 sheep_path = 'sheep.jpg'
 wolf_path = 'wolf.jpg'
+output_num_visualization_video = 1
+
 
 sheep, wolve, grass, count, setting = read_hdf(path)
 N = setting[0]
@@ -27,17 +27,20 @@ wolf_im = preprocessing_img(wolf_path, step, 2)
 
 
 # save number of plot
-# print(T)
-# print("T, count ",T, len(count))
 subsample = T//100
-cc = []
-for t in range(0,T,subsample):
-    cc.append(count[t*3])
-    cc.append(count[1+t*3])
-    cc.append(count[2+t*3])
-count = cc
-save_number_trend_plot(count,N,len(cc)//3,fps, plot_path)
-
+subsample = 1 if subsample==0 else subsample
+if subsample != 1:
+    cc = []
+    for t in range(0,T,subsample):
+        cc.append(count[t*3])
+        cc.append(count[1+t*3])
+        cc.append(count[2+t*3])
+    count = cc
+    save_number_trend_plot(count,N,len(cc)//3,fps, plot_path)
+else:
+    save_number_trend_plot(count,N,T,fps, plot_path)
+print("Save ",plot_path)
+    
 # save visualization
 cnt = 0
 count = T
@@ -48,7 +51,9 @@ while count > 0:
     else:
         tt = count
         count = 0
-    print(count)
+    # print(count)
+    if cnt == output_num_visualization_video:
+        break
     canvas_v = np.zeros((tt,outWidth,outWidth,3))
     for t in range(tt):
         canvas = np.zeros((outWidth,outWidth,3))
