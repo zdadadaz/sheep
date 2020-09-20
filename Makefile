@@ -2,10 +2,14 @@
 # INCLUDE_DIRS = /usr/include/hdf5/serial
 LIBRARY_DIRS = ~/usr/lib
 INCLUDE_DIRS = ~/usr/include
+CFLAGS = -I$(INCLUDE_DIRS) -L$(LIBRARY_DIRS) -std=c++0x -Wall -lm -lhdf5 -O0
 
 output:
-	gcc sheep_v2_omp.c -I$(INCLUDE_DIRS) -L$(LIBRARY_DIRS) -lhdf5 -std=gnu99 -fopenmp -lm -o sheep
-serial:
-	gcc sheep_v2_omp.c -I$(INCLUDE_DIRS) -L$(LIBRARY_DIRS) -lhdf5 -std=gnu99 -lm -o sheep
+	g++ sheep_v4.cpp ${CFLAGS} -o sheep
+#sheep.o: sheep_v4.cpp animal.h
+#	g++ -c ${CFLAGS} sheep_v4.cpp
+
+#animal.o: animal.cpp animal.h
+#    g++ -c ${CFLAGS} animal.cpp
 clean:
-	rm sheep
+	rm sheep 
