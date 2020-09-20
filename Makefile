@@ -2,7 +2,8 @@
 # INCLUDE_DIRS = /usr/include/hdf5/serial
 LIBRARY_DIRS = ~/usr/lib
 INCLUDE_DIRS = ~/usr/include
-CFLAGS = -I$(INCLUDE_DIRS) -L$(LIBRARY_DIRS) -std=c++0x -Wall -lm -lhdf5 -O0
+CFLAGS = -I$(INCLUDE_DIRS) -L$(LIBRARY_DIRS) -std=c++0x -Wall -lm -O0
+# CFLAGS = -I$(INCLUDE_DIRS) -L$(LIBRARY_DIRS) -std=c++0x -Wall -lm -lhdf5 -O0
 
 output:
 	g++ sheep_v4.cpp ${CFLAGS} -o sheep
