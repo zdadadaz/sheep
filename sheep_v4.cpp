@@ -5,7 +5,7 @@
 #include <assert.h>
 #include <time.h>
 #include <math.h>
-// #define FILE "animal.h5"
+#define FILE "animal.h5"
 #define N 25
 #define T 100
 #define initSheepNum 25
