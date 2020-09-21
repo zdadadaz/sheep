@@ -5,7 +5,6 @@
 #include <assert.h>
 #include <time.h>
 #include <math.h>
-// #define FILE "animal.h5"
 #define N 2500
 #define T 100
 #define initSheepNum 100
@@ -34,7 +33,7 @@ int tot_sheep=0;
 int tot_wolve = 0;
 int tot_grass = 0;
 
-int mat2hdf5(double *sdata, double *wdata, int *gdata, int *count, int *setting, char *filename)
+int mat2hdf5(double *sdata, double *wdata, int *gdata, int *count, int *setting, const char *filename)
 {
     hid_t file, space, space_c, space_set, dsets, dsetw, dsetg, dsetc, dsetset; /* Handles */
     herr_t status;
@@ -354,31 +353,27 @@ int main(void)
     for (int i = 0; i < 3 * T; i++)
         animalNum[i] = 0;
     int *setting = new int [2 * sizeof(int)];
-    animalNum[0] = tot_sheep;
-    animalNum[1] = tot_wolve;
-    animalNum[2] = tot_grass;
     setting[0] = N;
     setting[1] = T;
-    for (int t = 1; t < T; t++){
-        //init
-        init_sheep_wolve(sheeplist, 0);
-        init_sheep_wolve(wolflist, 1);
-        init_grass(grasslist);
-        // printf("%d, %d, %d\n", tot_sheep, tot_wolve, tot_grass);
-        //ask sheep
+    //init
+	init_sheep_wolve(sheeplist, 0);
+    init_sheep_wolve(wolflist, 1);
+    init_grass(grasslist);
+    for (int t = 0; t < T; t++){
+//        save2mat(sheep, sheeplist, t);
+//        save2mat(wolve, wolflist, t);
+//        save2matInt(grass, grasslist, t);
+//        animalNum[0 + t * 3] = tot_sheep;
+//        animalNum[1 + t * 3] = tot_wolve;
+//        animalNum[2 + t * 3] = tot_grass;
+		 //ask sheep
         ask_sheep(sheeplist, grasslist);
         //ask wolf
-        ask_wolf(wolflist, sheeplist);
+//        ask_wolf(wolflist, sheeplist);
         //ask grass
-        ask_patch(grasslist);
-        save2mat(sheep, sheeplist, t);
-        save2mat(wolve, wolflist, t);
-        save2matInt(grass, grasslist, t);
-        animalNum[0 + t * 3] = tot_sheep;
-        animalNum[1 + t * 3] = tot_wolve;
-        animalNum[2 + t * 3] = tot_grass;
+//        ask_patch(grasslist);
     }
-    mat2hdf5(sheep, wolve, grass, animalNum, setting, filename);
+    //mat2hdf5(sheep, wolve, grass, animalNum, setting, filename);
     delete [] sheep;
     delete [] grass;
     delete [] wolve;
