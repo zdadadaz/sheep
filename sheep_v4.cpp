@@ -5,7 +5,7 @@
 #include <assert.h>
 #include <time.h>
 #include <math.h>
-#define FILE "animal.h5"
+// #define FILE "animal.h5"
 #define N 2500
 #define T 100
 #define initSheepNum 100
@@ -17,14 +17,16 @@
 #define Grass 1
 #define initGrass 1200
 #define grassRegrowth 30 //time
-#define max(a, b) ({ __typeof__ (a) _a = (a); __typeof__ (b) _b = (b); _a > _b ? _a : _b; })
-#define min(a, b) ({ __typeof__ (a) _a = (a); __typeof__ (b) _b = (b); _a < _b ? _a : _b; })
+#include <algorithm>
+// #define max(a, b) ({ __typeof__ (a) _a = (a); __typeof__ (b) _b = (b); _a > _b ? _a : _b; })
+// #define min(a, b) ({ __typeof__ (a) _a = (a); __typeof__ (b) _b = (b); _a < _b ? _a : _b; })
 #define error 0.00001
 #define debug 0
 #include <list>
 #include <vector>
 #include <unordered_set>
 #include "hdf5.h"
+static const char filename[] = "animal.h5";
 
 using namespace std;
 int half = sqrt(N);
@@ -147,8 +149,8 @@ class Animal: public RandomWalk{
 		Animal(int x, int y, int d, int flag): RandomWalk(x,y,d){
 		sflag = flag;
      	gainFood = flag == 0 ? sheepGainFromFood : wolveGainFromFood;
-     	double energy_rand = max(1.0, (double)2 * gainFood * (double)rand() / (double)(RAND_MAX));
-     	energy = max(1.0, energy_rand);
+     	double energy_rand = std::max(1.0, (double)2 * gainFood * (double)rand() / (double)(RAND_MAX));
+     	energy = std::max(1.0, energy_rand);
 		};
 		void reduceEnergy(){energy -= 1;};
         void addEnergy() { energy += gainFood; }
@@ -197,7 +199,7 @@ void init_grass(vector<Grassclass> &grasses)
     for (int i = 0; i < N; i++){
         y = i / half;
         x = i - y * half;
-        count = (-1) * max(1.0, grassRegrowth * (float)rand() / (float)(RAND_MAX));
+        count = (-1) * std::max(1.0, (double)grassRegrowth * (float)rand() / (float)(RAND_MAX));
         Grassclass grass(x, y, count);
         grasses.push_back(grass);
     }
@@ -376,7 +378,7 @@ int main(void)
         animalNum[1 + t * 3] = tot_wolve;
         animalNum[2 + t * 3] = tot_grass;
     }
-    mat2hdf5(sheep, wolve, grass, animalNum, setting, FILE);
+    mat2hdf5(sheep, wolve, grass, animalNum, setting, filename);
     delete [] sheep;
     delete [] grass;
     delete [] wolve;
