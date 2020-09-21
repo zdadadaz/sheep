@@ -7,7 +7,7 @@
 #include <math.h>
 // #define FILE "animal.h5"
 #define N 25
-#define T 1000
+#define T 100
 #define initSheepNum 25
 #define sheepGainFromFood 4
 #define sheepReproduce 4 //%
@@ -24,11 +24,55 @@
 #include <list>
 #include <vector>
 #include <unordered_set>
+#include "hdf5.h"
+
 using namespace std;
 int half = sqrt(N);
 int tot_sheep=0;
 int tot_wolve = 0;
 int tot_grass = 0;
+
+int mat2hdf5(double *sdata, double *wdata, int *gdata, int *count, int *setting, char *filename)
+{
+    hid_t file, space, space_c, space_set, dsets, dsetw, dsetg, dsetc, dsetset; /* Handles */
+    herr_t status;
+    hsize_t dimset[1] = {2};
+    hsize_t dims[1] = {N * T};
+    hsize_t dims_count[1] = {3 * T};
+
+    char DATASETs[20] = "Ds_sheep";
+    char DATASETw[20] = "Ds_wolve";
+    char DATASETg[20] = "Ds_grass";
+    char DATASETc[20] = "Ds_count";
+    char DATASETset[20] = "Ds_set";
+
+    file = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+    space = H5Screate_simple(1, dims, NULL);
+    space_c = H5Screate_simple(1, dims_count, NULL);
+    space_set = H5Screate_simple(1, dimset, NULL);
+    dsets = H5Dcreate(file, DATASETs, H5T_IEEE_F64LE, space, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    dsetw = H5Dcreate(file, DATASETw, H5T_IEEE_F64LE, space, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    dsetg = H5Dcreate(file, DATASETg, H5T_STD_I64BE, space, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    dsetc = H5Dcreate(file, DATASETc, H5T_STD_I64BE, space_c, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    dsetset = H5Dcreate(file, DATASETset, H5T_STD_I64BE, space_set, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+
+    status = H5Dwrite(dsets, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, sdata);
+    status = H5Dwrite(dsetw, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, wdata);
+    status = H5Dwrite(dsetg, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, gdata);
+    status = H5Dwrite(dsetc, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, count);
+    status = H5Dwrite(dsetset, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, setting);
+
+    status = H5Dclose(dsets);
+    status = H5Dclose(dsetw);
+    status = H5Dclose(dsetg);
+    status = H5Dclose(dsetset);
+    status = H5Sclose(space);
+    status = H5Sclose(space_c);
+    status = H5Sclose(space_set);
+    status = H5Fclose(file);
+
+    return 0;
+}
 
 void gen_surroundxy(int curX, int curY, int xlist[8], int ylist[8])
 {
@@ -180,14 +224,26 @@ void eatGrass(Animal &sheep, vector<Grassclass> &grasses)
         tot_grass--;
     }
 }
+void eatSheep(Animal &wolf, list<Animal> &sheeplist)
+{
+    for (std::list<Animal>::iterator it = sheeplist.begin(); it != sheeplist.end(); ++it)
+    {
+        if ((wolf.x() == (*it).x()) && (wolf.y() == (*it).y()) && ((*it).gEnergy()))
+        {
+            wolf.addEnergy();
+            sheeplist.erase(it);
+            tot_sheep--;
+        }
+    }
+}
 void create_animal(list<Animal> &animals, Animal &animal)
 {
     int xlist[8] = {0}, ylist[8] = {0};
     // assume they can move randomly in 8 direction
     gen_surroundxy(animal.x(), animal.y(), xlist, ylist);
-    int i = (float)rand() / (float)(RAND_MAX)*7.99;
+    int i = (float)rand() / (float)(RAND_MAX)*7.99; //choose one direction to move
     valify_move(&xlist[i], &ylist[i]);
-    int d = (float) rand() / (float)(RAND_MAX)*7.99;
+    int d = (float) rand() / (float)(RAND_MAX)*7.99; // initialize direction
     Animal newAnimal(xlist[i], ylist[i], d, animal.gFlag());
     animals.push_back(newAnimal);
 }
@@ -201,14 +257,12 @@ void reproduce(list<Animal> &animals, Animal &animal)
         create_animal(animals, animal);
     }
 }
-void death(list<Animal> &animals, Animal &animal, int idx)
+void death(list<Animal> &animals, std::list<Animal>::iterator it)
 {
-    if (animal.gEnergy() <= error)
+    if ((*it).gEnergy() <= error)
     {
-        list<Animal>::iterator it = animals.begin();
-        advance(it,idx);
         animals.erase(it);
-        if (animal.gFlag() == 0)
+        if ((*it).gFlag() == 0)
         {
             tot_sheep -= 1;
             if (debug == 1)
@@ -222,6 +276,63 @@ void death(list<Animal> &animals, Animal &animal, int idx)
         }
     }
 }
+void ask_sheep(list<Animal>& sheeplist, vector<Grassclass>& grasslist)
+{
+    for (std::list<Animal>::iterator it = sheeplist.begin(); it != sheeplist.end(); ++it)
+    {
+        (*it).move();
+        if (Grass == 1)
+        {
+            (*it).reduceEnergy();
+            eatGrass((*it), grasslist);
+        }
+        if ((*it).gEnergy() > error)
+        {
+            reproduce(sheeplist, (*it));
+        }
+        death(sheeplist, it);
+    }
+}
+void ask_wolf(list<Animal> &wolflist, list<Animal> &sheeplist)
+{
+    for (std::list<Animal>::iterator it = wolflist.begin(); it != wolflist.end(); ++it)
+    {
+        (*it).move();
+        if (Grass == 1)
+        {
+            (*it).reduceEnergy();
+            eatSheep((*it), sheeplist);
+        }
+        if ((*it).gEnergy() > 0)
+        {
+            reproduce(wolflist, (*it));
+        }
+        death(wolflist, it);
+    }
+}
+void ask_patch(vector<Grassclass> &grasslist)
+{
+    for (Grassclass grass : grasslist){
+        if (grass.gNum() == 0)
+            tot_grass++;
+        if (grass.gNum() < 1)
+            grass.sNum(grass.gNum()+1);
+    }
+}
+void save2mat(double *matTime, list<Animal> *mat, int t)
+{
+    int base = N * t;
+    for (Animal animal : mat){
+        matTime[animal.x() + half * animal.y() + base] = animal.gEnerge();
+    }
+}
+void save2matInt(int *matTime, vector<Grassclass> &grasslist, int t)
+{
+    int base = N * t;
+    for (int i = 0; i < N; i++)
+        matTime[i + base] = grasslist[i].gNum();
+}
+
 int main(void)
 {
     srand(time(NULL));
@@ -234,32 +345,29 @@ int main(void)
 	std::list<Animal> sheeplist;
     std::list<Animal> wolflist;
     std::vector<Grassclass> grasslist;
-    // Animal sheep (2,3,0,0);
-	// printf("%d, %d, %d\n",sheep.x(),sheep.y(),sheep.d());
-	// sheep.move();
-	
-    //init
-    init_sheep_wolve(sheeplist, 0);
-    init_sheep_wolve(wolflist, 1);
-    init_grass(grasslist);
-    printf("%d, %d, %d\n", tot_sheep, tot_wolve, tot_grass);
-    //ask sheep
-    int count = 0;
-    for (Animal sheep : sheeplist)
-    {
-        sheep.move();
-        if (Grass == 1){
-            sheep.reduceEnergy();
-            eatGrass(sheep, grasslist);
-        }
-        if (sheep.gEnergy()>0){
-            reproduce(sheeplist, sheep);
-        }
-        death(sheeplist, sheep, count);
-        count += 1;
-    }
-    //ask wolf
-    //ask grass
+    double *sheep = new double (N * T * sizeof(double));
+    double *wolve = new double (N * T * sizeof(double));
+    int *grass = new int (N * T * sizeof(int));
 
+    for (int t = 1; t < T; t++){
+        //init
+        init_sheep_wolve(sheeplist, 0);
+        init_sheep_wolve(wolflist, 1);
+        init_grass(grasslist);
+        // printf("%d, %d, %d\n", tot_sheep, tot_wolve, tot_grass);
+        //ask sheep
+        ask_sheep(sheeplist, grasslist);
+        //ask wolf
+        ask_wolf(wolflist, sheeplist);
+        //ask grass
+        ask_patch(grasslist);
+        save2mat(sheep, sheeplist, t);
+        save2mat(wolve, wolflist, t);
+        save2matInt(grass, grasslist, t);
+    }
+    mat2hdf5(sheep, wolve, grass, animalNum, setting, FILE);
+    free(sheep);
+    free(grass);
+    free(wolve);
     return 0;
 }
