@@ -6,7 +6,7 @@
 #include <time.h>
 #include <math.h>
 #define N 2500
-#define T 100
+#define T 1000
 #define initSheepNum 100
 #define sheepGainFromFood 4
 #define sheepReproduce 4 //%
@@ -24,7 +24,7 @@
 #include <list>
 #include <vector>
 #include <unordered_set>
-#include "hdf5.h"
+// #include "hdf5.h"
 static const char filename[] = "animal.h5";
 
 using namespace std;
@@ -33,47 +33,47 @@ int tot_sheep=0;
 int tot_wolve = 0;
 int tot_grass = 0;
 
-int mat2hdf5(double *sdata, double *wdata, int *gdata, int *count, int *setting, const char *filename)
-{
-    hid_t file, space, space_c, space_set, dsets, dsetw, dsetg, dsetc, dsetset; /* Handles */
-    herr_t status;
-    hsize_t dimset[1] = {2};
-    hsize_t dims[1] = {N * T};
-    hsize_t dims_count[1] = {3 * T};
+// int mat2hdf5(double *sdata, double *wdata, int *gdata, int *count, int *setting, const char *filename)
+// {
+//     hid_t file, space, space_c, space_set, dsets, dsetw, dsetg, dsetc, dsetset; /* Handles */
+//     herr_t status;
+//     hsize_t dimset[1] = {2};
+//     hsize_t dims[1] = {N * T};
+//     hsize_t dims_count[1] = {3 * T};
 
-    char DATASETs[20] = "Ds_sheep";
-    char DATASETw[20] = "Ds_wolve";
-    char DATASETg[20] = "Ds_grass";
-    char DATASETc[20] = "Ds_count";
-    char DATASETset[20] = "Ds_set";
+//     char DATASETs[20] = "Ds_sheep";
+//     char DATASETw[20] = "Ds_wolve";
+//     char DATASETg[20] = "Ds_grass";
+//     char DATASETc[20] = "Ds_count";
+//     char DATASETset[20] = "Ds_set";
 
-    file = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
-    space = H5Screate_simple(1, dims, NULL);
-    space_c = H5Screate_simple(1, dims_count, NULL);
-    space_set = H5Screate_simple(1, dimset, NULL);
-    dsets = H5Dcreate(file, DATASETs, H5T_IEEE_F64LE, space, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-    dsetw = H5Dcreate(file, DATASETw, H5T_IEEE_F64LE, space, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-    dsetg = H5Dcreate(file, DATASETg, H5T_STD_I64BE, space, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-    dsetc = H5Dcreate(file, DATASETc, H5T_STD_I64BE, space_c, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-    dsetset = H5Dcreate(file, DATASETset, H5T_STD_I64BE, space_set, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+//     file = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+//     space = H5Screate_simple(1, dims, NULL);
+//     space_c = H5Screate_simple(1, dims_count, NULL);
+//     space_set = H5Screate_simple(1, dimset, NULL);
+//     dsets = H5Dcreate(file, DATASETs, H5T_IEEE_F64LE, space, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+//     dsetw = H5Dcreate(file, DATASETw, H5T_IEEE_F64LE, space, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+//     dsetg = H5Dcreate(file, DATASETg, H5T_STD_I64BE, space, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+//     dsetc = H5Dcreate(file, DATASETc, H5T_STD_I64BE, space_c, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+//     dsetset = H5Dcreate(file, DATASETset, H5T_STD_I64BE, space_set, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
 
-    status = H5Dwrite(dsets, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, sdata);
-    status = H5Dwrite(dsetw, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, wdata);
-    status = H5Dwrite(dsetg, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, gdata);
-    status = H5Dwrite(dsetc, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, count);
-    status = H5Dwrite(dsetset, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, setting);
+//     status = H5Dwrite(dsets, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, sdata);
+//     status = H5Dwrite(dsetw, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, wdata);
+//     status = H5Dwrite(dsetg, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, gdata);
+//     status = H5Dwrite(dsetc, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, count);
+//     status = H5Dwrite(dsetset, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, setting);
 
-    status = H5Dclose(dsets);
-    status = H5Dclose(dsetw);
-    status = H5Dclose(dsetg);
-    status = H5Dclose(dsetset);
-    status = H5Sclose(space);
-    status = H5Sclose(space_c);
-    status = H5Sclose(space_set);
-    status = H5Fclose(file);
+//     status = H5Dclose(dsets);
+//     status = H5Dclose(dsetw);
+//     status = H5Dclose(dsetg);
+//     status = H5Dclose(dsetset);
+//     status = H5Sclose(space);
+//     status = H5Sclose(space_c);
+//     status = H5Sclose(space_set);
+//     status = H5Fclose(file);
 
-    return 0;
-}
+//     return 0;
+// }
 
 void gen_surroundxy(int curX, int curY, int xlist[8], int ylist[8])
 {
@@ -105,8 +105,9 @@ class Grassclass{
         void reset(){number = (-1) * grassRegrowth;};
 };
 void Grassclass::countdown(){
-    if (number==0)
+    if (number==0){
         tot_grass++;
+    }
     if (number < 1)
         number++;
 }
@@ -247,12 +248,17 @@ void create_animal(list<Animal> &animals, Animal &animal)
     int d = (float) rand() / (float)(RAND_MAX)*7.99; // initialize direction
     Animal newAnimal(xlist[i], ylist[i], d, animal.gFlag());
     animals.push_back(newAnimal);
+    if (animal.gFlag()==0){
+        tot_sheep++;
+    }else{
+        tot_wolve++;
+    }
 }
 void reproduce(list<Animal> &animals, Animal &animal)
 {
     float randint = (float)rand() / (float)(RAND_MAX)*100;
     int cond_reproduce_rate = (animal.gFlag() == 0) ? sheepReproduce : wolveReproduce;
-    if (randint < (float)cond_reproduce_rate)
+    if ((randint < (float)cond_reproduce_rate) && (animals.size() < N))
     {
         animal.divideEnergy();
         create_animal(animals, animal);
@@ -287,38 +293,33 @@ void ask_sheep(list<Animal>& sheeplist, vector<Grassclass>& grasslist)
             (*it).reduceEnergy();
             eatGrass((*it), grasslist);
         }
+        death(sheeplist, it);
         if ((*it).gEnergy() > error)
         {
             reproduce(sheeplist, (*it));
         }
-        death(sheeplist, it);
+        
     }
 }
 void ask_wolf(list<Animal> &wolflist, list<Animal> &sheeplist)
 {
     for (std::list<Animal>::iterator it = wolflist.begin(); it != wolflist.end(); ++it)
     {
-        (*it).move();
-        if (Grass == 1)
-        {
-            (*it).reduceEnergy();
-            eatSheep((*it), sheeplist);
-        }
+        (*it).move();        
+        (*it).reduceEnergy();
+        eatSheep((*it), sheeplist);
+        death(wolflist, it);
         if ((*it).gEnergy() > 0)
         {
             reproduce(wolflist, (*it));
         }
-        death(wolflist, it);
+        
     }
 }
 void ask_patch(vector<Grassclass> &grasslist)
 {
-    for (Grassclass grass : grasslist){
-        if (grass.gNum() == 0)
-            tot_grass++;
-        if (grass.gNum() < 1)
-            grass.sNum(grass.gNum()+1);
-    }
+    for (std::vector<Grassclass>::iterator it = grasslist.begin(); it != grasslist.end(); ++it)
+        (*it).countdown();
 }
 void save2mat(double *matTime, list<Animal> &mat, int t)
 {
@@ -358,20 +359,25 @@ int main(void)
     //init
 	init_sheep_wolve(sheeplist, 0);
     init_sheep_wolve(wolflist, 1);
-    init_grass(grasslist);
+    if (Grass != 0)
+        init_grass(grasslist);
+    else
+        tot_grass = N;
     for (int t = 0; t < T; t++){
-//        save2mat(sheep, sheeplist, t);
-//        save2mat(wolve, wolflist, t);
-//        save2matInt(grass, grasslist, t);
-//        animalNum[0 + t * 3] = tot_sheep;
-//        animalNum[1 + t * 3] = tot_wolve;
-//        animalNum[2 + t * 3] = tot_grass;
-		 //ask sheep
+    //    save2mat(sheep, sheeplist, t);
+    //    save2mat(wolve, wolflist, t);
+    //    save2matInt(grass, grasslist, t);
+        animalNum[0 + t * 3] = tot_sheep;
+        animalNum[1 + t * 3] = tot_wolve;
+        animalNum[2 + t * 3] = tot_grass;
+		printf("%d, %d, %d\n", tot_sheep, tot_wolve, tot_grass);
+        //  ask sheep
         ask_sheep(sheeplist, grasslist);
         //ask wolf
-//        ask_wolf(wolflist, sheeplist);
+        ask_wolf(wolflist, sheeplist);
         //ask grass
-//        ask_patch(grasslist);
+        if (Grass != 0)
+            ask_patch(grasslist);
     }
     //mat2hdf5(sheep, wolve, grass, animalNum, setting, filename);
     delete [] sheep;
