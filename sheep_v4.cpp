@@ -348,7 +348,15 @@ int main(void)
     double *sheep = new double (N * T * sizeof(double));
     double *wolve = new double (N * T * sizeof(double));
     int *grass = new int (N * T * sizeof(int));
-
+    int *animalNum = new int (3 * T * sizeof(int));
+    for (int i = 0; i < 3 * T; i++)
+        animalNum[i] = 0;
+    int *setting = new int (2 * sizeof(int));
+    animalNum[0] = tot_sheep;
+    animalNum[1] = tot_wolve;
+    animalNum[2] = tot_grass;
+    setting[0] = N;
+    setting[1] = T;
     for (int t = 1; t < T; t++){
         //init
         init_sheep_wolve(sheeplist, 0);
@@ -364,10 +372,15 @@ int main(void)
         save2mat(sheep, sheeplist, t);
         save2mat(wolve, wolflist, t);
         save2matInt(grass, grasslist, t);
+        animalNum[0 + t * 3] = tot_sheep;
+        animalNum[1 + t * 3] = tot_wolve;
+        animalNum[2 + t * 3] = tot_grass;
     }
     mat2hdf5(sheep, wolve, grass, animalNum, setting, FILE);
     free(sheep);
     free(grass);
     free(wolve);
+    free(animalNum);
+    free(setting);
     return 0;
 }
