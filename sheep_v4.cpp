@@ -6,16 +6,16 @@
 #include <time.h>
 #include <math.h>
 // #define FILE "animal.h5"
-#define N 25
+#define N 2500
 #define T 100
-#define initSheepNum 25
+#define initSheepNum 100
 #define sheepGainFromFood 4
 #define sheepReproduce 4 //%
-#define initWolveNum 25
+#define initWolveNum 50
 #define wolveGainFromFood 20
 #define wolveReproduce 5 //%
 #define Grass 1
-#define initGrass 25
+#define initGrass 1200
 #define grassRegrowth 30 //time
 #define max(a, b) ({ __typeof__ (a) _a = (a); __typeof__ (b) _b = (b); _a > _b ? _a : _b; })
 #define min(a, b) ({ __typeof__ (a) _a = (a); __typeof__ (b) _b = (b); _a < _b ? _a : _b; })
@@ -319,11 +319,11 @@ void ask_patch(vector<Grassclass> &grasslist)
             grass.sNum(grass.gNum()+1);
     }
 }
-void save2mat(double *matTime, list<Animal> *mat, int t)
+void save2mat(double *matTime, list<Animal> &mat, int t)
 {
     int base = N * t;
     for (Animal animal : mat){
-        matTime[animal.x() + half * animal.y() + base] = animal.gEnerge();
+        matTime[animal.x() + half * animal.y() + base] = animal.gEnergy();
     }
 }
 void save2matInt(int *matTime, vector<Grassclass> &grasslist, int t)
@@ -345,13 +345,13 @@ int main(void)
 	std::list<Animal> sheeplist;
     std::list<Animal> wolflist;
     std::vector<Grassclass> grasslist;
-    double *sheep = new double (N * T * sizeof(double));
-    double *wolve = new double (N * T * sizeof(double));
-    int *grass = new int (N * T * sizeof(int));
-    int *animalNum = new int (3 * T * sizeof(int));
+    double *sheep = new double [N * T * sizeof(double)];
+    double *wolve = new double [N * T * sizeof(double)];
+    int *grass = new int [N * T * sizeof(int)];
+    int *animalNum = new int [3 * T * sizeof(int)];
     for (int i = 0; i < 3 * T; i++)
         animalNum[i] = 0;
-    int *setting = new int (2 * sizeof(int));
+    int *setting = new int [2 * sizeof(int)];
     animalNum[0] = tot_sheep;
     animalNum[1] = tot_wolve;
     animalNum[2] = tot_grass;
@@ -377,10 +377,10 @@ int main(void)
         animalNum[2 + t * 3] = tot_grass;
     }
     mat2hdf5(sheep, wolve, grass, animalNum, setting, FILE);
-    free(sheep);
-    free(grass);
-    free(wolve);
-    free(animalNum);
-    free(setting);
+    delete [] sheep;
+    delete [] grass;
+    delete [] wolve;
+    delete [] animalNum;
+    delete [] setting;
     return 0;
 }
