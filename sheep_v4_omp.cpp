@@ -5,16 +5,16 @@
 #include <time.h>
 #include <math.h>
 #include <omp.h>
-#define N 2500
-#define T 1000
-#define initSheepNum 100
+#define N 1000000
+#define T 400
+#define initSheepNum 700000 //400
 #define sheepGainFromFood 4
 #define sheepReproduce 4 //%
-#define initWolveNum 50
+#define initWolveNum 700000 //200
 #define wolveGainFromFood 20
 #define wolveReproduce 5 //%
 #define Grass 1
-#define initGrass 1200
+#define initGrass 500000 //5000
 #define grassRegrowth 30 //time
 #include <algorithm>
 #define error 0.00001
@@ -234,6 +234,7 @@ void eatSheep(Animal &wolf, list<Animal> &sheeplist)
             wolf.addEnergy();
             it = sheeplist.erase(it);
             tot_sheep--;
+            break;
         }
     }
 }
@@ -285,28 +286,18 @@ void death(list<Animal> &animals, std::list<Animal>::iterator& it)
 void ask_sheep(list<Animal>& sheeplist, vector<Grassclass>& grasslist)
 {
     for (std::list<Animal>::iterator it = sheeplist.begin(); it != sheeplist.end(); ++it)
-    { 
-
-        // #pragma omp task firstprivate(it)   
-        // {
-            (*it).move();
-            if (Grass == 1){
-                (*it).reduceEnergy();
-            }
-        // }
+    {
+        (*it).move();
         if (Grass == 1)
         {
+            (*it).reduceEnergy();
             eatGrass((*it), grasslist);
         }
-        // #pragma omp task firstprivate(it)   
-        // {
-            if ((*it).gEnergy() > error)
-            {
-                reproduce(sheeplist, (*it));
-            }
-        // }
+        if ((*it).gEnergy() > error)
+        {
+            reproduce(sheeplist, (*it));
+        }
         death(sheeplist, it);
-         
     }
 }
 void ask_wolf(list<Animal> &wolflist, list<Animal> &sheeplist)
@@ -314,19 +305,13 @@ void ask_wolf(list<Animal> &wolflist, list<Animal> &sheeplist)
 	std::list<Animal>::iterator endit = wolflist.end();
     for (std::list<Animal>::iterator it = wolflist.begin(); it != endit; ++it)
     {
-        // #pragma omp task firstprivate(it)
-        // {
-            (*it).move();        
-            (*it).reduceEnergy();
-        // }
+        (*it).move();
+        (*it).reduceEnergy();
         eatSheep((*it), sheeplist);
-        // #pragma omp task firstprivate(it)
-        // {
-            if ((*it).gEnergy() > error)
-            {
-                reproduce(wolflist, (*it));
-            }
-        // }
+        if ((*it).gEnergy() > error)
+        {
+            reproduce(wolflist, (*it));
+        }
         death(wolflist, it);
     }
 }
@@ -345,15 +330,23 @@ void save2mat(double *matTime, list<Animal> &mat, int t)
 {
     // int ID = omp_get_thread_num();
     // printf("mat %d\n", ID);
-
+    // no improvement
+//https://stackoverflow.com/questions/8691459/how-do-i-parallelize-a-for-loop-through-a-c-stdlist-using-openmp
     int base = N * t;
-    for (std::list<Animal>::iterator it = mat.begin(); it != mat.end(); ++it)
+    std::list<Animal>::iterator it;
+#pragma omp parallel private(it)
     {
-        #pragma omp task firstprivate(it)
+        for (it = mat.begin(); it != mat.end(); ++it)
+        {
+// #pragma omp task firstprivate(it)
+#pragma omp single nowait
         {
             matTime[(*it).x() + half * (*it).y() + base] = (*it).gEnergy();
         }
     }
+// #pragma omp taskwait
+}
+    
 }
 void save2matInt(int *matTime, vector<Grassclass> &grasslist, int t)
 {
@@ -362,10 +355,14 @@ void save2matInt(int *matTime, vector<Grassclass> &grasslist, int t)
 
     // worse?????
     int base = N * t;
-    // #pragma omp taskloop
-    for (int i = 0; i < N; i++)
+    int i;
+    #pragma omp parallel
     {
-        matTime[i + base] = grasslist[i].gNum();
+        #pragma omp for
+        for (i = 0; i < N; i++)
+        {
+            matTime[i + base] = grasslist[i].gNum();
+        }
     }
 }
 
@@ -399,49 +396,40 @@ int main(void)
     else{
         tot_grass = N;
     }
-    #pragma omp parallel //num_threads(4)
+    for (int t = 0; t < T; t++)
     {
-        int ID = omp_get_thread_num();
-        #pragma omp single
-        {
-            for (int t = 0; t < T; t++)
-            {
-                // #pragma omp parallel
-                #pragma omp task
-                {
-                    // ID = omp_get_thread_num();
-                    // printf("sheep %d\n", ID);
-                    save2mat(sheep, sheeplist, t);
-                }
-                #pragma omp task
-                {
-                    // ID = omp_get_thread_num();
-                    // printf("wolve %d\n", ID);
-                    save2mat(wolve, wolflist, t);
-                }    
-                #pragma omp task
-                {
-                    // ID = omp_get_thread_num();
-                    // printf("grass %d\n", ID);
-                    save2matInt(grass, grasslist, t);
-                }    
-                
-                animalNum[0 + t * 3] = tot_sheep;
-                animalNum[1 + t * 3] = tot_wolve;
-                animalNum[2 + t * 3] = tot_grass;
-                #pragma omp taskwait
+        // #pragma omp parallel
+        // #pragma omp task
+        // {
+        //     // ID = omp_get_thread_num();
+        //     // printf("sheep %d\n", ID);
+            save2mat(sheep, sheeplist, t);
+        // }
+        // #pragma omp task
+        // {
+        //     // ID = omp_get_thread_num();
+        //     // printf("wolve %d\n", ID);
+            save2mat(wolve, wolflist, t);
+        // }    
+        // #pragma omp task
+        // {
+            // ID = omp_get_thread_num();
+            // printf("grass %d\n", ID);
+            // save2matInt(grass, grasslist, t);
+        // }    
+        
+        animalNum[0 + t * 3] = tot_sheep;
+        animalNum[1 + t * 3] = tot_wolve;
+        animalNum[2 + t * 3] = tot_grass;
 
-                // printf("%d, %d, %d\n", tot_sheep, tot_wolve, tot_grass);
-                //  ask sheep
-                ask_sheep(sheeplist, grasslist);
-                //ask wolf
-                ask_wolf(wolflist, sheeplist);
-                //ask grass
-                if (Grass != 0)
-                    ask_patch(grasslist);
-            // #pragma omp taskwait
-            }
-        }
+        // printf("%d, %d, %d\n", tot_sheep, tot_wolve, tot_grass);
+        //  ask sheep
+        // ask_sheep(sheeplist, grasslist);
+        //ask wolf
+        // ask_wolf(wolflist, sheeplist);
+        //ask grass
+        // if (Grass != 0)
+        //     ask_patch(grasslist);
     }
 	// mat2hdf5(sheep, wolve, grass, animalNum, setting, filename);
 
