@@ -129,7 +129,7 @@ void RandomWalk::move(){
     gen_surroundxy(curX, curY, xlist, ylist);
     for (int i = 0; i < 8; i++)
         valify_move(&xlist[i], &ylist[i]);
-    int randdir = (float)rand() / (float)(RAND_MAX)*2.99; //Brownian movement
+    int randdir = (float)rand()  *2.99; //Brownian movement
     randdir += sd - 1;
     randdir = randdir < 0 ? (randdir + 8) : randdir;
     randdir = randdir > 7 ? (randdir - 8) : randdir;
@@ -175,8 +175,8 @@ void init_sheep_wolve(list<Animal> &sheeps, int flag)
     
     while (sheepNum < initnumber)
     {
-        int randint = (float)rand() / (float)(RAND_MAX) * (N - 1);
-        direction = 7.99 * (float)rand() / (float)(RAND_MAX);
+        int randint = (float)rand()   * (N - 1);
+        direction = 7.99 * (float)rand()  ;
         y = randint / half;
         x = randint - y * half;
         Animal animal(x, y, direction, flag);
@@ -194,14 +194,14 @@ void init_grass(vector<Grassclass> &grasses)
     for (int i = 0; i < N; i++){
         y = i / half;
         x = i - y * half;
-        count = (-1) * std::max(1.0, (double)grassRegrowth * (float)rand() / (float)(RAND_MAX));
+        count = (-1) * std::max(1.0, (double)grassRegrowth * (float)rand()  );
         Grassclass grass(x, y, count);
         grasses.push_back(grass);
     }
     std::unordered_set<int> grassSet;
     while (grassNum < initGrass)
     {
-        int randint = (float)rand() / (float)(RAND_MAX) * (N - 1);
+        int randint = (float)rand()   * (N - 1);
         if (grassSet.find(randint) != grassSet.end())
             continue;
         grassSet.insert(randint);
@@ -229,6 +229,7 @@ void eatSheep(Animal &wolf, list<Animal> &sheeplist)
             wolf.addEnergy();
             it = sheeplist.erase(it);
             tot_sheep--;
+            break;
         }
     }
 }
@@ -237,9 +238,9 @@ void create_animal(list<Animal> &animals, Animal &animal)
     int xlist[8] = {0}, ylist[8] = {0};
     // assume they can move randomly in 8 direction
     gen_surroundxy(animal.x(), animal.y(), xlist, ylist);
-    int i = (float)rand() / (float)(RAND_MAX)*7.99; //choose one direction to move
+    int i = (float)rand()  *7.99; //choose one direction to move
     valify_move(&xlist[i], &ylist[i]);
-    int d = (float) rand() / (float)(RAND_MAX)*7.99; // initialize direction
+    int d = (float) rand()  *7.99; // initialize direction
     Animal newAnimal(xlist[i], ylist[i], d, animal.gFlag());
     animals.push_back(newAnimal);
     if (animal.gFlag()==0){
@@ -250,7 +251,7 @@ void create_animal(list<Animal> &animals, Animal &animal)
 }
 void reproduce(list<Animal> &animals, Animal &animal)
 {
-    float randint = (float)rand() / (float)(RAND_MAX)*100;
+    float randint = (float)rand()  *100;
     int cond_reproduce_rate = (animal.gFlag() == 0) ? sheepReproduce : wolveReproduce;
     if ((randint < (float)cond_reproduce_rate) && (animals.size() < N))
     {
