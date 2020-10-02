@@ -4,16 +4,16 @@
 #include <assert.h>
 #include <time.h>
 #include <math.h>
-#define N 1000000
-#define T 10
-#define initSheepNum 400000
+#define N 10000
+#define T 400
+#define initSheepNum 400
 #define sheepGainFromFood 4
 #define sheepReproduce 4 //%
-#define initWolveNum 200000
+#define initWolveNum 200
 #define wolveGainFromFood 20
 #define wolveReproduce 5 //%
 #define Grass 1
-#define initGrass 500000
+#define initGrass 5000
 #define grassRegrowth 30 //time
 #include <algorithm>
 #define merror 0.00001
@@ -172,11 +172,6 @@ class Animal: public RandomWalk{
      	gainFood = flag == 0 ? sheepGainFromFood : wolveGainFromFood;
      	double energy_rand = std::max(1.0, (double)2 * gainFood * (double)randFloat(0., 1.) );
      	energy = std::max(1.0, energy_rand);
-		};
-        Animal(int x, int y, int d, int flag, float inenergy): RandomWalk(x,y,d){
-		sflag = flag;
-     	gainFood = flag == 0 ? sheepGainFromFood : wolveGainFromFood;
-     	energy = inenergy;
 		};
 		void reduceEnergy(){energy -= 1;};
         void addEnergy() { energy += gainFood; }
@@ -510,6 +505,9 @@ void save2mat(double *matTime, vector<Animal> &mat, int t)
 }
 void save2matInt(int *matTime, vector<Grassclass> &grasslist, int t)
 {
+    // int ID = omp_get_thread_num();
+    // printf("int %d\n", ID);
+
     int base = N * t;
     int i;
     #pragma omp parallel
@@ -530,118 +528,6 @@ void renew_vector(vector<Animal> &mat){
     }
     mat = newMat;
 }
-void animalvec2mat(vector<Animal> &mat, float *energy, int *xydf){
-    int i, vec_size = mat.size();
-    #pragma omp parallel
-    {
-        #pragma omp for
-        for (i = 0; i < vec_size; i++)
-        {
-            energy[i] = mat[i].gEnergy();
-            xydf[i*4]= mat[i].x();
-            xydf[i*4+1]= mat[i].y();
-            xydf[i*4+2]= mat[i].d();
-            xydf[i*4+3] = mat[i].gFlag();
-        }
-    }
-}
-void mat2animalvec(vector<Animal> &mat, float* energy, int* xydf, int energySize){
-    int i, vec_size = energySize;
-    #pragma omp parallel
-    {
-        vector<Animal> local;
-        #pragma omp for
-        for (i = 0; i < vec_size; i++)
-        {
-            Animal animal(xydf[i*4],xydf[i*4+1],xydf[i*4+2],xydf[i*4+3], energy[i]);
-            local.push_back(animal);
-        }
-        mat.insert(mat.end(), local.begin(), local.end());
-    }
-}
-
-void grassvec2mat(vector<Grassclass> &mat, int* xyn){
-    int i, vec_size = mat.size();
-    #pragma omp parallel
-    {
-        #pragma omp for
-        for (i = 0; i < vec_size; i++)
-        {
-            xyn[i*3]= mat[i].x();
-            xyn[i*3+1]= mat[i].y();
-            xyn[i*3+2]= mat[i].gNum();
-        }
-    }
-}
-void mat2grassvec(vector<Grassclass> &mat, int* xyn, int size){
-    int i, vec_size = size;
-    #pragma omp parallel
-    {
-        vector<Grassclass> local;
-        #pragma omp for
-        for (i = 0; i < vec_size; i++)
-        {
-            Grassclass grass(xyn[i*3],xyn[i*3+1],xyn[i*3+2]);
-            local.push_back(grass);
-        }
-        mat.insert(mat.end(), local.begin(), local.end());
-    }
-}
-void initialize_parallel(vector<Grassclass> &grasslist, vector<Animal> &sheeplist, vector<Animal> &wolflist){
-    int world_rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
-    int world_size;
-    MPI_Comm_size(MPI_COMM_WORLD, &world_size);
-    if (world_size < 3){
-        if(world_rank == 0){
-            init_sheep_wolve(sheeplist, 0);
-            init_sheep_wolve(wolflist, 1);
-            if (Grass != 0)
-            {
-                init_grass(grasslist);
-            }
-            else{
-                tot_grass = N;
-            }
-        }
-    }else{
-        if (world_rank == 0){
-            init_sheep_wolve(sheeplist, 0);
-            float* energy = new float [initSheepNum * sizeof(float)];
-            int* xydf = new int [initSheepNum * 4 * sizeof(int)];
-            MPI_Recv(energy, initWolveNum, MPI_FLOAT, 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            MPI_Recv(xydf, initWolveNum*4, MPI_INT, 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            mat2animalvec(wolflist, energy, xydf, initWolveNum);
-            if (Grass!= 0){
-                int* xyn = new int[N * 3 * sizeof(int)];
-                MPI_Recv(xyn, N*3, MPI_INT, 2, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-                mat2grassvec(grasslist, xyn, N);
-            }else{
-                tot_grass = N;
-            }
-            // printf("%d, %d, %d\n", (int)sheeplist.size(), (int)wolflist.size(), (int)grasslist.size());
-        }
-        if (world_rank == 1){
-            init_sheep_wolve(wolflist, 1);
-            int size = wolflist.size();
-            float* energy = new float[size * sizeof(float)];
-            int* xydf = new int[size * 4 * sizeof(int)];
-            animalvec2mat(wolflist, energy, xydf);
-            MPI_Send(energy, size, MPI_FLOAT, 0, 0, MPI_COMM_WORLD);
-            MPI_Send(xydf, size*4, MPI_INT, 0, 0, MPI_COMM_WORLD);
-        }
-        if (world_rank == 2){
-            if (Grass != 0)
-            {
-                init_grass(grasslist);
-                int* xyn = new int[N * 3 * sizeof(double)];
-                grassvec2mat(grasslist, xyn);
-                MPI_Send(xyn, N*3, MPI_INT, 0, 0, MPI_COMM_WORLD);
-            }
-        }
-
-    }
-}
 
 int main(void)
 {
@@ -651,12 +537,6 @@ int main(void)
     assert(initWolveNum>=0 && initWolveNum <= N && "wolve init number should be smaller than N and greater equals to zero");
     assert(initGrass>=0 && initGrass <= N && "grass init number should be smaller than N and greater equals to zero");
 
-    MPI_Init(NULL, NULL);
-    int world_rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
-    int world_size;
-    MPI_Comm_size(MPI_COMM_WORLD, &world_size);
-    // printf("Hello from process %d out of %d\n", world_rank, world_size);
 	std::vector<Animal> sheeplist;
     std::vector<Animal> wolflist;
     std::vector<Grassclass> grasslist(N);
@@ -672,52 +552,50 @@ int main(void)
     setting[0] = N;
     setting[1] = T;
     //init
-    // world_size < 3 use serial
-    // world_size >= 3 use one processor for one agent
-    initialize_parallel(grasslist, sheeplist, wolflist);
-
-    if (world_rank == 0){
-
-        for (int t = 0; t < T; t++)
-        {
-    #ifdef visualization
-            // #pragma omp parallel num_threads(3)
-            // {
-            //     int i = omp_get_thread_num();
-            //     if (i ==0){
-                    save2mat(sheep, sheeplist, t);
-                // }
-                // if (i ==1){
-                    save2mat(wolve, wolflist, t);
-                // }
-                // if (i==2){
-                    save2matInt(grass, grasslist, t);
-            //     }
-            // }
-    #endif
-            animalNum[0 + t * 3] = tot_sheep;
-            animalNum[1 + t * 3] = tot_wolve;
-            animalNum[2 + t * 3] = tot_grass;
-    // //         // get_state(sheeplist, wolflist, grasslist);
-    // //         // printf("%d, %d, %d\n", tot_sheep, tot_wolve, tot_grass);
-    //         // //ask grass
-    //         if (Grass != 0)
-    //             ask_patch(grasslist);
-    //         //  ask sheep
-    //         // ask_sheep(sheeplist, grasslist);
-    //         // // //ask wolf
-    //         // ask_wolf(wolflist, sheeplist);
-            
-    //         // renew_vector(sheeplist);
-    //         // renew_vector(wolflist);
-        }
-    }else{
-        while (true){
-
-        }
-
+	init_sheep_wolve(sheeplist, 0);
+    init_sheep_wolve(wolflist, 1);
+    if (Grass != 0)
+    {
+        init_grass(grasslist);
     }
-// 	// mat2hdf5(sheep, wolve, grass, animalNum, setting, filename);
+    else{
+        tot_grass = N;
+    }
+
+    for (int t = 0; t < T; t++)
+    {
+#ifdef visualization
+        // #pragma omp parallel num_threads(3)
+        // {
+        //     int i = omp_get_thread_num();
+        //     if (i ==0){
+                save2mat(sheep, sheeplist, t);
+            // }
+            // if (i ==1){
+                save2mat(wolve, wolflist, t);
+            // }
+            // if (i==2){
+                save2matInt(grass, grasslist, t);
+        //     }
+        // }
+#endif
+        animalNum[0 + t * 3] = tot_sheep;
+        animalNum[1 + t * 3] = tot_wolve;
+        animalNum[2 + t * 3] = tot_grass;
+        // get_state(sheeplist, wolflist, grasslist);
+        // printf("%d, %d, %d\n", tot_sheep, tot_wolve, tot_grass);
+        // //ask grass
+        if (Grass != 0)
+            ask_patch(grasslist);
+        //  ask sheep
+        ask_sheep(sheeplist, grasslist);
+        // //ask wolf
+        ask_wolf(wolflist, sheeplist);
+        
+        renew_vector(sheeplist);
+        renew_vector(wolflist);
+    }
+	// mat2hdf5(sheep, wolve, grass, animalNum, setting, filename);
 
 #ifdef visualization
     delete [] sheep;
@@ -726,8 +604,6 @@ int main(void)
 #endif
     delete [] animalNum;
     delete [] setting;
-
-    MPI_Finalize();
     return 0;
 }
 
