@@ -330,13 +330,15 @@ void get_state(vector<Animal> &sheeps, vector<Animal> &wolves, vector<Grassclass
     int tot_sheep_acc = sheeps.size();
     int tot_wolf_acc = wolves.size();
     int tot_grass_acc = 0;
+    int i, vec_size = grasses.size();
 #pragma omp parallel
     {
         int local_tot = 0;
         #pragma omp for
-        for (Grassclass a : grasses)
+        // for (Grassclass a : grasses)
+        for (i = 0; i < vec_size; i++)
         {
-            if (a.gNum() > 0)
+            if (grasses[i].gNum() > 0)
             {
                 local_tot+=1;
             }
