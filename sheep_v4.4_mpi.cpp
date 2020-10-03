@@ -596,6 +596,11 @@ void mat2grassvec(vector<Grassclass> &mat, int* xyn, int start, int end){
     }
     
 }
+void gen_agent_rankid(int dim, int* idlist){
+    for (int j= 0; j < dim; j++){
+            idlist[j] = j*3;
+    }
+}
 void gen_agent_processor(int* dim){
     int world_size;
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
@@ -625,53 +630,21 @@ void initialize_parallel(vector<Grassclass> &grasslist, vector<Animal> &sheeplis
         }
     }else{
         if (world_rank == 0){
-            init_sheep_wolve(sheeplist, 0);
-            float* energy = new float [initSheepNum * sizeof(float)];
-            int* xydf = new int [initSheepNum * 4 * sizeof(int)];
-            MPI_Recv(energy, initWolveNum, MPI_FLOAT, 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            MPI_Recv(xydf, initWolveNum*4, MPI_INT, 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            mat2animalvec(wolflist, energy, xydf, initWolveNum);
-
-            if (Grass!= 0){
-                int* xyn = new int[N * 3 * sizeof(int)];
-                MPI_Recv(xyn, N*3, MPI_INT, 2, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-                mat2grassvec(grasslist, xyn, 0, N);
-                delete [] xyn;
-            }else{
-                tot_grass = N;
-            }
-            tot_sheep = initSheepNum;
-            tot_wolve = initWolveNum;
-            // printf("%d, %d, %d\n", (int)sheeplist.size(), (int)wolflist.size(), (int)grasslist.size());
-            delete [] energy;
-            delete [] xydf;
-        }
-        if (world_rank == 1){
-            init_sheep_wolve(wolflist, 1);
-            int size = wolflist.size();
-            float* energy = new float[size * sizeof(float)];
-            int* xydf = new int[size * 4 * sizeof(int)];
-            animalvec2mat(wolflist, energy, xydf, 0, size);
-            MPI_Send(energy, size, MPI_FLOAT, 0, 0, MPI_COMM_WORLD);
-            MPI_Send(xydf, size*4, MPI_INT, 0, 0, MPI_COMM_WORLD);
-            delete [] energy;
-            delete [] xydf;
-        }
-        if (world_rank == 2){
             if (Grass != 0)
             {
                 init_grass(grasslist);
-                int size = grasslist.size();
-                int* xyn = new int[N * 3 * sizeof(int)];
-                grassvec2mat(grasslist, xyn, 0, size);
-                MPI_Send(xyn, N*3, MPI_INT, 0, 0, MPI_COMM_WORLD);
-                delete [] xyn;
             }
+        }
+        if (world_rank == 1){
+            init_sheep_wolve(sheeplist, 0);
+        }
+        if (world_rank == 2){
+            init_sheep_wolve(wolflist, 1);            
         }
     }
 }
 template <class S>
-void my_scatter(S* data, int* count, MPI_Datatype datatype, int* idlist, int numSub, MPI_Comm communicator){
+void my_scatter_send(S* data, int* count, MPI_Datatype datatype, int* idlist, int numSub, MPI_Comm communicator){
     int world_rank;
     MPI_Comm_rank(communicator, &world_rank);
     int world_size;
@@ -679,23 +652,25 @@ void my_scatter(S* data, int* count, MPI_Datatype datatype, int* idlist, int num
     int root = 0;
 
     if (world_rank == root) {
-        // If we are the root process, send our data to everyone
-        int i;
-        for (i = 0; i < numSub; i++) {
+        // If we are the root process, scatter our data to everyone
+        for (int i = 0; i < numSub; i++) {
             if (idlist[i] != world_rank) {
                 MPI_Send(data+i*(*count), (*count), datatype, idlist[i], 0, communicator);
             }
         }
-    } else {
-        // If we are a receiver process, receive the data from the root
-        int number_amount;
-        MPI_Status status;
-        MPI_Probe(0, 0, MPI_COMM_WORLD, &status);
-        MPI_Get_count(&status, MPI_INT, &number_amount);
-        data = (S*)malloc(sizeof(S) * number_amount);
-        *count = number_amount;
-        MPI_Recv(data, number_amount, datatype, root, 0, communicator, MPI_STATUS_IGNORE);
-    }
+    } 
+}
+template <class S>
+void my_scatter_rec(S** data, int* count, MPI_Datatype datatype, int* idlist, int numSub, MPI_Comm communicator){
+    int root = 0;
+    // If we are a receiver process, receive the data from the root
+    int number_amount;
+    MPI_Status status;
+    MPI_Probe(0, 0, MPI_COMM_WORLD, &status);
+    MPI_Get_count(&status, MPI_INT, &number_amount);
+    *data = new S [sizeof(S) * number_amount];
+    *count = number_amount;
+    MPI_Recv(*data, number_amount, datatype, root, 0, communicator, MPI_STATUS_IGNORE);
 }
 
 template <class S>
@@ -711,24 +686,24 @@ void my_gather(S* data, int* count, MPI_Datatype datatype, int* idlist, int numS
         int i;
         for (i = 0; i < numSub; i++) {
             if (idlist[i] != world_rank) {
-                MPI_Recv(data+i*(*count), (*count), datatype, idlist[i], 0, communicator);
+                MPI_Recv(data+i*(*count), (*count), datatype, idlist[i], 0, communicator, MPI_STATUS_IGNORE);
             }
         }
     } else {
         // If we are a receiver process, send the data to the root
-        MPI_Send(data, *count, datatype, root, 0, communicator, MPI_STATUS_IGNORE);
+        MPI_Send(data, *count, datatype, root, 0, communicator);
     }
 
 }
-void act_grass_root(vector<Grassclass>& grasslist, int* dim, int* idlist){
+void act_grass_master(vector<Grassclass>& grasslist, int* dim, int* idlist, MPI_Comm communicator){
     int size = grasslist.size();
     int num_elements_per_proc = size/dim[0];
     int num_elements_per_proc3 = num_elements_per_proc * 3;
-    int* xyn = new int[N * 3 * sizeof(double)];
+    int* xyn = new int[N * 3 * sizeof(int)];
     
     // send data from proc 0 to rest proc included root proc
     grassvec2mat(grasslist, xyn, 0, size);
-    my_scatter(xyn, &num_elements_per_proc3, MPI_INT, idlist, dim[0], MPI_COMM_WORLD);
+    my_scatter_send(xyn, &num_elements_per_proc3, MPI_INT, idlist, dim[0], communicator);
 
     // run grass patch for root's part
     ask_patch(grasslist, 0, num_elements_per_proc);
@@ -736,18 +711,21 @@ void act_grass_root(vector<Grassclass>& grasslist, int* dim, int* idlist){
     if (num_elements_per_proc*dim[0] != size){
         ask_patch(grasslist, num_elements_per_proc*dim[0], size);
     }
+    // receive data from slaves
     my_gather(xyn, &num_elements_per_proc3, MPI_INT, idlist, dim[0], MPI_COMM_WORLD);
     mat2grassvec(grasslist, xyn, num_elements_per_proc, num_elements_per_proc*dim[0]);
     delete [] xyn;
 }
-void act_grass_slaves(){
+void act_grass_slaves(int* dim, int* idlist){
     // receive from root
     int* sub_xyn;
     int num_elements_per_proc;
-    my_scatter(sub_xyn, &num_elements_per_proc, MPI_INT, idlist, dim[0], MPI_COMM_WORLD);
+    
+    my_scatter_rec(&sub_xyn, &num_elements_per_proc, MPI_INT, idlist, dim[0], MPI_COMM_WORLD);
     // create sub grasslist in slave processor
     vector<Grassclass> sub_grasslist;
     num_elements_per_proc /= 3;
+    // printf("%d, %d\n",num_elements_per_proc, (int)N);
     mat2grassvec(sub_grasslist, sub_xyn, 0, num_elements_per_proc);
     // run ask patch
     ask_patch(sub_grasslist, 0, num_elements_per_proc);
@@ -758,56 +736,55 @@ void act_grass_slaves(){
     delete [] sub_xyn;
 }
 
-void act_parallel(vector<Animal> &sheeplist, vector<Animal> &wolflist, vector<Grassclass> &grasslist){
+void act_master(vector<Animal> &sheeplist, vector<Animal> &wolflist, vector<Grassclass> &grasslist){
     int world_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
     int world_size;
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
 
-    int* dim = new int [3 * sizeof(int)];
+    int* dim = new int [3 * sizeof(int)]();
     gen_agent_processor(dim);
+    int* idlist = new int [sizeof(int) * dim[0]];
+
     if (world_size < 3){
         // serial
         // //ask grass
         if (Grass != 0)
-            ask_patch(grasslist, 0);
+            ask_patch(grasslist, 0, N);
         //  ask sheep
         ask_sheep(sheeplist, grasslist);
         // //ask wolf
         ask_wolf(wolflist, sheeplist);
-
+        get_state(sheeplist, wolflist, grasslist);
         renew_vector(sheeplist);
         renew_vector(wolflist);
     }
     else{
         // parallel
-        // grass
+        // grass master
         if (Grass != 0)
         {
-            int* idlist = new int [dim[0] * sizeof(int)];
-            for (int j= 0; j < dim[0]; j++)
-                idlist[j] = j*3;
-            act_grass_root(grasslist, dim, idlist);
+            gen_agent_rankid(dim[0], idlist);
+            act_grass_master(grasslist, dim, idlist, MPI_COMM_WORLD);
         }
-        // sheep
+        // receive from sheep, wolf 
+
+        // agent eat 
+
+        // state calculate
+
+        // send back to agent master and slaves
     }
 
     delete [] dim;
+    delete [] idlist;
 }
 
 void stopCondition(int t){
     int world_size;
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
-  
-    if (t == T-1){
-        for (int j = 1; j < world_size; j++){
-            MPI_Send(&t, 1, MPI_INT, j, 44, MPI_COMM_WORLD);
-        }
-    }
-    else{
-        for (int j = 1; j < world_size; j++){
-            MPI_Send(&t, 1, MPI_INT, j, 2, MPI_COMM_WORLD);
-        }
+    for (int j = 1; j < world_size; j++){
+        MPI_Send(&t, 1, MPI_INT, j, 44, MPI_COMM_WORLD);
     }
 }
 
@@ -846,7 +823,6 @@ int main(void)
     initialize_parallel(grasslist, sheeplist, wolflist);
 
     if (world_rank == 0){
-
         for (int t = 0; t < T; t++)
         {
     #ifdef visualization
@@ -867,33 +843,100 @@ int main(void)
             animalNum[0 + t * 3] = tot_sheep;
             animalNum[1 + t * 3] = tot_wolve;
             animalNum[2 + t * 3] = tot_grass;
-            act_parallel(sheeplist, wolflist, grasslist);
-    // //         // get_state(sheeplist, wolflist, grasslist);
-    // //         // printf("%d, %d, %d\n", tot_sheep, tot_wolve, tot_grass);
-    //         // //ask grass
-    //         if (Grass != 0)
-    //             ask_patch(grasslist);
-    //         //  ask sheep
-    //         // ask_sheep(sheeplist, grasslist);
-    //         // // //ask wolf
-    //         // ask_wolf(wolflist, sheeplist);
-            
-    //         // renew_vector(sheeplist);
-    //         // renew_vector(wolflist);
+            act_master(sheeplist, wolflist, grasslist);
+            printf("t %d\n",t);
             stopCondition(t);
+            
         }
-    }else{
-        while (true){
+        MPI_Finalize();
+    }else if(world_rank == 1){
+        while(1){
             MPI_Status status;
-            act_grass_slaves();
-
+            int* dim = new int [3 * sizeof(int)]();
+            gen_agent_processor(dim);
+            // sheep master
 
             // break while t is the last frame
             int tmp;
-            MPI_Recv(&tmp, 1, MPI_INT, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-            if (status.MPI_TAG == 44){
+            MPI_Recv(&tmp, 1, MPI_INT, 0, 44, MPI_COMM_WORLD, &status);
+            if (tmp == T-1){
                 MPI_Finalize();
                 break;
+            }
+        }
+    }else if(world_rank == 2){
+        while(1){
+            MPI_Status status;
+            int* dim = new int [3 * sizeof(int)]();
+            gen_agent_processor(dim);
+            // wolf master
+
+            // break while t is the last frame
+            int tmp;
+            MPI_Recv(&tmp, 1, MPI_INT, 0, 44, MPI_COMM_WORLD, &status);
+            if (tmp == T-1){
+                MPI_Finalize();
+                break;
+            }
+        }
+    }
+    else{
+        if (world_rank % 3 == 0){
+            while (true){
+                MPI_Status status;
+                int* dim = new int [3 * sizeof(int)]();
+                gen_agent_processor(dim);
+
+                // grass slaves
+                int* idlist = new int [sizeof(int) * dim[0]];
+                gen_agent_rankid(dim[0], idlist);
+                act_grass_slaves(dim, idlist);
+
+                // break while t is the last frame
+                int tmp;
+                MPI_Recv(&tmp, 1, MPI_INT, 0, 44, MPI_COMM_WORLD, &status);
+                if (tmp == T-1){
+                    MPI_Finalize();
+                    break;
+                }
+            }
+        }
+        if (world_rank % 3 == 1){
+            while (true){
+                MPI_Status status;
+                int* dim = new int [3 * sizeof(int)]();
+                gen_agent_processor(dim);
+                // sheep slaves
+                int* idlist = new int [sizeof(int) * dim[1]];
+                gen_agent_rankid(dim[1], idlist);
+
+                // break while t is the last frame
+                int tmp;
+                MPI_Recv(&tmp, 1, MPI_INT, 0, 44, MPI_COMM_WORLD, &status);
+                if (tmp == T-1){
+                    MPI_Finalize();
+                    break;
+                }
+            }
+        }
+        if (world_rank % 3 ==2){
+            while (true){
+                MPI_Status status;
+                int* dim = new int [3 * sizeof(int)]();
+                gen_agent_processor(dim);
+                // wolf slaves
+                int* idlist = new int [sizeof(int) * dim[2]];
+                gen_agent_rankid(dim[2], idlist);
+
+
+                // break while t is the last frame
+                int tmp;
+                MPI_Recv(&tmp, 1, MPI_INT, 0, 44, MPI_COMM_WORLD, &status);
+                if (tmp == T-1){
+                    MPI_Finalize();
+                    break;
+                }
+
             }
         }
 
@@ -908,7 +951,7 @@ int main(void)
     delete [] animalNum;
     delete [] setting;
 
-    MPI_Finalize();
+    // MPI_Finalize();
     return 0;
 }
 
