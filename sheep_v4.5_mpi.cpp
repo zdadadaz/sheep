@@ -5,11 +5,11 @@
 #include <time.h>
 #include <math.h>
 #define N 1000000
-#define T 10
-#define initSheepNum 400000
+#define T 100
+#define initSheepNum 40000
 #define sheepGainFromFood 4
 #define sheepReproduce 4 //%
-#define initWolveNum 200000
+#define initWolveNum 20000
 #define wolveGainFromFood 20
 #define wolveReproduce 5 //%
 #define Grass 1
@@ -24,7 +24,8 @@
 #include <unordered_set>
 #include <mpi.h>
 #include <omp.h>
-
+#include <fstream>
+#include <iterator>
 
 // #include "hdf5.h"
 static const char filename[] = "animal.h5";
@@ -248,10 +249,10 @@ void init_grass(vector<Grassclass> &grasses)
 }
 int eatGrass(Animal &sheep, vector<Grassclass> &grasses)
 {
+    int out= 0;
     // omp_lock_t writelock;
     // omp_init_lock(&writelock);
     // omp_set_lock(&writelock);
-    int out= 0;
     if (grasses[sheep.x() + half * sheep.y()].gNum() == 1)
     {
         sheep.addEnergy();
@@ -259,8 +260,8 @@ int eatGrass(Animal &sheep, vector<Grassclass> &grasses)
         out = 1;
         // tot_grass--;
     }
-    return out;
     // omp_unset_lock(&writelock);
+    return out;
 }
 int death(vector<Animal> &animals, Animal &animal)
 {
@@ -304,6 +305,31 @@ int eatSheep(Animal &wolf, vector<Animal> &sheeplist)
     }
     return out;
 }
+int eatSheep_parallel(Animal &wolf, Animal &sheep, vector<Animal> &sheeplist){
+    int out = 0;
+    if ((wolf.x() == sheep.x()) && (wolf.y() == sheep.y()) && (sheep.gEnergy()> merror))
+    {
+        wolf.addEnergy();
+        sheep.sEnergy(-1);
+        out = death(sheeplist, sheep);
+    }
+    return out;
+
+}
+int eatSheep_overlap(Animal &wolf, vector<Animal> &sheeplist, vector<int>& sheepPos ){
+    int vec_size = sheepPos.size();
+    int out = 0;
+    for (int i = 1; i < vec_size; i++){
+        if (sheeplist[i].gEnergy()> merror){
+            wolf.addEnergy();
+            sheeplist[i].sEnergy(-1);
+            out = death(sheeplist, sheeplist[i]);
+            break;
+        }
+    }
+    return out;
+}
+
 int create_animal(vector<Animal> &animals, Animal &animal)
 {
     int xlist[8] = {0}, ylist[8] = {0};
@@ -328,6 +354,7 @@ int reproduce(vector<Animal> &animals, Animal &animal)
 {
     float randint = (float)randFloat(0., 1.)  *100;
     int cond_reproduce_rate = (animal.gFlag() == 0) ? sheepReproduce : wolveReproduce;
+
     int out = 0;
     if ((randint < (float)cond_reproduce_rate) && (animals.size() < N))
     {
@@ -358,7 +385,11 @@ void get_state(vector<Animal> &sheeps, vector<Animal> &wolves, vector<Grassclass
         #pragma omp critical
         tot_grass_acc += local_tot;
     }
-    printf("s (%d, %d), w (%d, %d), g (%d, %d)\n", tot_sheep, tot_sheep_acc, tot_wolve, tot_wolf_acc, tot_grass, tot_grass_acc);
+    tot_grass = tot_grass_acc;
+    tot_sheep = tot_sheep_acc;
+    tot_wolve = tot_wolf_acc;
+    // printf("s %d, w %d, g %d\n", tot_sheep, tot_wolve, tot_grass);
+    // printf("s (%d, %d), w (%d, %d), g (%d, %d)\n", tot_sheep, tot_sheep_acc, tot_wolve, tot_wolf_acc, tot_grass, tot_grass_acc);
 }
 void ask_sheep(vector<Animal>& sheeplist, vector<Grassclass>& grasslist)
 {
@@ -420,7 +451,6 @@ void ask_sheep(vector<Animal>& sheeplist, vector<Grassclass>& grasslist)
         tot_sheep += local_tot;
     }
 }
-
 void ask_wolf(vector<Animal> &wolflist, vector<Animal> &sheeplist)
 {
     int vec_size = wolflist.size();
@@ -470,6 +500,7 @@ void ask_wolf(vector<Animal> &wolflist, vector<Animal> &sheeplist)
         tot_wolve += local_tot;
     }
 }
+// move, reduceEnergy, death, reproduce
 void ask_animal(int agent, vector<Animal>& animallist, vector<Animal>& newanimallist, int start, int end)
 {
     int vec_size = end;
@@ -494,8 +525,6 @@ void ask_animal(int agent, vector<Animal>& animallist, vector<Animal>& newanimal
             int out = death(animallist, animallist[i]);
             local_tot -= out;
         }
-        #pragma omp critical
-        tot_sheep += local_tot;
     }
 
     #pragma omp parallel
@@ -503,9 +532,9 @@ void ask_animal(int agent, vector<Animal>& animallist, vector<Animal>& newanimal
         std::vector<Animal> animallist_tmp;
         int local_tot = 0;
         #pragma omp for
-        for (int i = 0; i < vec_size; i++)
+        for (int i = start; i < vec_size; i++)
         {
-            if (animallist[i].gEnergy() > reproduceThreshold)
+            if (animallist[i].gEnergy() > reproduceThreshold) // merror) //
             {
                 int out = reproduce(animallist_tmp, animallist[i]);
                 local_tot += out;
@@ -514,10 +543,9 @@ void ask_animal(int agent, vector<Animal>& animallist, vector<Animal>& newanimal
         #pragma omp critical
         {
             newanimallist.insert(newanimallist.end(), animallist_tmp.begin(), animallist_tmp.end());
-            tot_sheep += local_tot;
+            // tot_sheep += local_tot;
         }
     }
-    
 }
 void ask_patch(vector<Grassclass> &grasslist, int start, int end)
 {
@@ -565,11 +593,19 @@ void save2matInt(int *matTime, vector<Grassclass> &grasslist, int t)
         }
     }
 }
-void renew_vector(vector<Animal> &mat,vector<Animal> newMat, int start, int end){
-    for (int i = start; i < end; i++){
-        if (mat[i].gEnergy() > merror){
-            newMat.push_back(mat[i]);
+void renew_vector(vector<Animal> &mat,vector<Animal>& newMat, int start, int end){
+    int vec_size = end;
+    #pragma omp parallel
+    {
+        vector<Animal> local;
+        #pragma omp for
+        for (int i = start; i < vec_size; i++){
+            if (mat[i].gEnergy() > merror){
+                local.push_back(mat[i]);
+            }
         }
+        #pragma omp critical
+        newMat.insert(newMat.end(), local.begin(), local.end());
     }
 }
 
@@ -642,7 +678,6 @@ void mat2grassvec(vector<Grassclass> &mat, int* xyn, int start, int end){
             }
         }
     }
-    
 }
 void gen_agent_rankid(int agent, int dim, int* idlist){
     for (int j= 0; j < dim; j++){
@@ -658,7 +693,27 @@ void gen_agent_processor(int* dim){
         }
     }
 }
+void send_animal(vector<Animal>& animallist){
+    int size = animallist.size();
+    float* energy = new float[size * sizeof(float)];
+    int* xydf = new int[size * 4 * sizeof(int)];
+    animalvec2mat(animallist, energy, xydf, 0, size);
+    MPI_Send(energy, size, MPI_FLOAT, 0, 0, MPI_COMM_WORLD);
+    MPI_Send(xydf, size*4, MPI_INT, 0, 0, MPI_COMM_WORLD);
+    delete [] energy;
+    delete [] xydf;
 
+}
+void receive_animal(vector<Animal>& animallist, int agent){
+    int iniNum = agent == 1? initSheepNum:initWolveNum;
+    float* energy = new float [iniNum * sizeof(float)];
+    int* xydf = new int [iniNum * 4 * sizeof(int)];
+    MPI_Recv(energy, iniNum, MPI_FLOAT, agent, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    MPI_Recv(xydf, iniNum * 4, MPI_INT, agent, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    mat2animalvec(animallist, energy, xydf, iniNum);
+    delete [] energy;
+    delete [] xydf;
+}
 void initialize_parallel(vector<Grassclass> &grasslist, vector<Animal> &sheeplist, vector<Animal> &wolflist){
     int world_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
@@ -681,13 +736,21 @@ void initialize_parallel(vector<Grassclass> &grasslist, vector<Animal> &sheeplis
             if (Grass != 0)
             {
                 init_grass(grasslist);
+                tot_grass = initGrass;
             }
+            receive_animal(sheeplist, 1);
+            receive_animal(wolflist, 2);
+            tot_sheep = initSheepNum;
+            tot_wolve = initWolveNum;
+
         }
         if (world_rank == 1){
             init_sheep_wolve(sheeplist, 0);
+            send_animal(sheeplist);
         }
         if (world_rank == 2){
-            init_sheep_wolve(wolflist, 1);            
+            init_sheep_wolve(wolflist, 1);        
+            send_animal(wolflist);    
         }
     }
 }
@@ -774,12 +837,12 @@ void act_grass_slaves(int* dim, int* idlist){
     // receive from root
     int* sub_xyn;
     int num_elements_per_proc;
-    
+
+    // receive data from master 0 
     my_scatter_rec(&sub_xyn, &num_elements_per_proc, MPI_INT, 0, idlist, dim[0], MPI_COMM_WORLD);
     // create sub grasslist in slave processor
     vector<Grassclass> sub_grasslist;
     num_elements_per_proc /= 3;
-    // printf("%d, %d\n",num_elements_per_proc, (int)N);
     mat2grassvec(sub_grasslist, sub_xyn, 0, num_elements_per_proc);
     // run ask patch
     ask_patch(sub_grasslist, 0, num_elements_per_proc);
@@ -789,61 +852,6 @@ void act_grass_slaves(int* dim, int* idlist){
     my_gather(sub_xyn, &num_elements_per_proc, MPI_INT, 0, idlist, dim[0], MPI_COMM_WORLD);
     delete [] sub_xyn;
 }
-
-void act_animal_master(vector<Animal>& animal,int agent, int* dim, int* idlist, MPI_Comm communicator){
-    int size = animal.size();
-    int num_elements_per_proc = size/dim[agent];
-    int num_elements_per_proc4 = num_elements_per_proc * 4;
-    float* energy = new float[size * sizeof(float)];
-    int* xydf = new int[size * 4 * sizeof(int)];
-    // new born
-    // the maximum new born animals two times more than original numbers.
-    int newBornNumber = (agent == 1) ? ((float) size * (float)(100+sheepReproduce*2)/100.0):((float) size * (float)(100+wolveReproduce*2)/100.0);
-    float* new_energy = new float[newBornNumber * sizeof(float)];
-    int* new_xydf = new int[newBornNumber * 4 * sizeof(int)];
-    int new_num_elements_per_proc;
-    int new_num_elements_per_proc4;
-    vector<Animal> newanimallist;
-    vector<Animal> outAnimal;
-    
-    
-    // send data from proc 0 to rest proc included root proc
-    animalvec2mat(animal, energy, xydf, 0, size);
-    my_scatter_send(energy, &num_elements_per_proc, MPI_FLOAT, agent, idlist, dim[agent], communicator);
-    my_scatter_send(xydf, &num_elements_per_proc4, MPI_INT, agent, idlist, dim[agent], communicator);
-
-    // run animal move, reduction, death, reproduce for root's part
-    ask_animal(agent, animal, newanimallist, 0, num_elements_per_proc);
-    // corner case taken cared by root proc for the agent in the far back
-    if (num_elements_per_proc*dim[agent] != size){
-        ask_animal(agent, animal, newanimallist, num_elements_per_proc*dim[agent], size);
-    }
-    // clean death sheep
-    vector<Animal> sub_animal;
-    renew_vector(animal, sub_animal, 0, num_elements_per_proc * dim[agent]);
-    // append new born animal to original animal
-    sub_animal.insert(sub_animal.end(), newanimallist.begin(), newanimallist.end());
-    // append corner case to sub_animal
-    if (num_elements_per_proc*dim[agent] != size){
-        sub_animal.insert(sub_animal.end(), animal.begin() + num_elements_per_proc * dim[agent], animal.end());
-    }
-    new_num_elements_per_proc = sub_animal.size();
-    new_num_elements_per_proc4 = new_num_elements_per_proc * 4;
-    animalvec2mat(sub_animal, new_energy, new_xydf, 0, new_num_elements_per_proc);
-    
-    // receive data from slaves with dynamic size
-    my_gather(new_energy, &new_num_elements_per_proc, MPI_FLOAT, agent, idlist, dim[agent], MPI_COMM_WORLD);
-    my_gather(new_xydf, &new_num_elements_per_proc4, MPI_INT, agent, idlist, dim[agent], MPI_COMM_WORLD);
-    mat2animalvec(outAnimal, new_energy, new_xydf, new_num_elements_per_proc);
-    animal = outAnimal;
-
-    delete [] new_energy;
-    delete [] energy;
-    delete [] new_xydf;
-    delete [] xydf;
-
-}
-
 void act_animal_slaves(int agent, int* dim, int* idlist){
     // receive from root
     float* sub_energy;
@@ -851,33 +859,160 @@ void act_animal_slaves(int agent, int* dim, int* idlist){
     int num_elements_per_proc;
     int num_elements_per_proc4;
     
-    my_scatter_rec(&sub_energy, &num_elements_per_proc, MPI_FLOAT, agent, idlist, dim[agent], MPI_COMM_WORLD);
-    my_scatter_rec(&sub_xydf, &num_elements_per_proc4, MPI_INT, agent, idlist, dim[agent], MPI_COMM_WORLD);
+    //receive from master 0
+    my_scatter_rec(&sub_energy, &num_elements_per_proc, MPI_FLOAT, 0, idlist, dim[agent], MPI_COMM_WORLD);
+    my_scatter_rec(&sub_xydf, &num_elements_per_proc4, MPI_INT, 0, idlist, dim[agent], MPI_COMM_WORLD);
     // create sub grasslist in slave processor
     vector<Animal> sub_animal;
     vector<Animal> sub_newanimal;
-    // printf("%d, %d\n",num_elements_per_proc, (int)N);
     mat2animalvec(sub_animal, sub_energy, sub_xydf, num_elements_per_proc);
     // run animal move, reduction, death, reproduce for slaves
     ask_animal(agent, sub_animal, sub_newanimal, 0, num_elements_per_proc);
-    // clean death sheep
+    // clean death animal
     vector<Animal> sub_animal_clean;
-    renew_vector(sub_animal, sub_animal_clean, 0, num_elements_per_proc);
-    // append new born animal to original animal
-    sub_animal_clean.insert(sub_animal_clean.end(), sub_newanimal.begin(), sub_newanimal.end());
+    // renew_vector(sub_animal, sub_animal_clean, 0, num_elements_per_proc);
+    // // append new born animal to original animal
+    // sub_animal_clean.insert(sub_animal_clean.end(), sub_newanimal.begin(), sub_newanimal.end());
 
-    // slave proc (sub_xydf, sub_energy) to vector and send back to root
-    num_elements_per_proc = sub_animal_clean.size();
+    // no clean death animal
+    sub_animal.insert(sub_animal.end(), sub_newanimal.begin(), sub_newanimal.end());
+    sub_animal_clean = sub_animal;
+
+    // slave proc (sub_xydf, sub_energy) to vector and send back to master 0
+    num_elements_per_proc = sub_animal_clean.size(); //if clean
     num_elements_per_proc4 = num_elements_per_proc * 4;
     animalvec2mat(sub_animal_clean, sub_energy, sub_xydf, 0, num_elements_per_proc);
-    my_gather(sub_energy, &num_elements_per_proc, MPI_FLOAT, agent, idlist, dim[agent], MPI_COMM_WORLD);
-    my_gather(sub_xydf, &num_elements_per_proc4, MPI_INT, agent, idlist, dim[agent], MPI_COMM_WORLD);
+
+    // send size first
+    int send_num = 1;
+    int* send_size = new int [sizeof(int)*send_num];
+    send_size[0] = num_elements_per_proc;
+    my_gather(send_size, &send_num, MPI_INT, 0, idlist, dim[agent], MPI_COMM_WORLD);
+    // send data later
+    my_gather(sub_energy, &num_elements_per_proc, MPI_FLOAT, 0, idlist, dim[agent], MPI_COMM_WORLD);
+    my_gather(sub_xydf, &num_elements_per_proc4, MPI_INT, 0, idlist, dim[agent], MPI_COMM_WORLD);
     delete [] sub_energy;
     delete [] sub_xydf;
 
 }
+void act_animal_corner(vector<Animal>& animal, vector<Animal>& animal_corner, int agent, int* dim){
+    int size = animal.size();
+    int num_elements_per_proc = size/dim[agent];
+    vector<Animal> newanimallist;
+        
+    // corner case taken cared by root proc for the agent in the far back
+    if (num_elements_per_proc * dim[agent] != size){
+        ask_animal(agent, animal, newanimallist, num_elements_per_proc*dim[agent], size);
+    }
+    // clean death sheep
+    // renew_vector(animal, animal_corner, num_elements_per_proc*dim[agent], size);
 
-void stopCondition(int t){
+    // append new born animal to original animal
+    animal_corner.insert(animal_corner.end(), newanimallist.begin(), newanimallist.end());
+
+}
+void animal_scatter(vector<Animal>& animal,int agent, int* dim, int* idlist, MPI_Comm communicator){
+    int size = animal.size();
+    int num_elements_per_proc = size/dim[agent];
+    int num_elements_per_proc4 = num_elements_per_proc * 4;
+    float* energy = new float[size * sizeof(float)];
+    int* xydf = new int[size * 4 * sizeof(int)];
+    // printf("dim %d, idlist %d,%d\n",dim[agent], idlist[0],idlist[1]);
+    
+    // send data from master 0 to rest proc, sheep (1,4,7..)/ wolf(2,5,8,...)
+    animalvec2mat(animal, energy, xydf, 0, size);
+    my_scatter_send(energy, &num_elements_per_proc, MPI_FLOAT, 0, idlist, dim[agent], communicator);
+    my_scatter_send(xydf, &num_elements_per_proc4, MPI_INT, 0, idlist, dim[agent], communicator);
+
+    delete [] energy;
+    delete [] xydf;
+}
+
+void animal_gather(vector<Animal>& animal,int agent, int* dim, int* idlist, MPI_Comm communicator){
+    // new born
+    // the maximum new born animals two times more than original numbers.
+    int newBornNumber = 0;
+    int* new_size = new int [dim[agent] * sizeof(int)];
+    int new_dim = 0;
+    int new_num_elements_per_proc = 0;
+    int new_num_elements_per_proc4 = 0;
+    vector<Animal> outAnimal;
+
+    // receive size of data from each processor
+    my_gather(new_size, &new_dim, MPI_INT, 0, idlist, dim[agent], MPI_COMM_WORLD);
+    
+    for (int i = 0; i< new_dim; i++){
+        newBornNumber += new_size[i];
+    }
+
+    float* new_energy = new float[newBornNumber * sizeof(float)];
+    int* new_xydf = new int[newBornNumber * 4 * sizeof(int)];
+    
+    // receive data from each processor with dynamic size
+    my_gather(new_energy, &new_num_elements_per_proc, MPI_FLOAT, 0, idlist, dim[agent], MPI_COMM_WORLD);
+    my_gather(new_xydf, &new_num_elements_per_proc4, MPI_INT, 0, idlist, dim[agent], MPI_COMM_WORLD);
+
+    // printf("total animal %d\n", new_num_elements_per_proc);
+    mat2animalvec(outAnimal, new_energy, new_xydf, new_num_elements_per_proc);
+    animal = outAnimal;
+    delete [] new_energy;   
+    delete [] new_xydf;
+}
+void animal_eat(vector<Animal> &sheeplist, vector<Animal> &wolflist, vector<Grassclass> &grasslist){
+    int vec_size;
+    vec_size = sheeplist.size();
+    vector<vector<int>> sheep2d(N, vector<int> (1, 0));
+    vector<vector<int>> wolf2d(N, vector<int> (1, 0));
+    #pragma omp parallel
+    {
+        #pragma omp for
+        for (int i = 0; i < vec_size; i++)
+        {
+            if ((Grass == 1) && (sheeplist[i].gEnergy()>merror))
+            {
+                eatGrass(sheeplist[i], grasslist);
+            }
+        }
+    }
+    // speed bottle neck
+    // store the index of sheep in the vector for look up while wolf eat sheep
+    for (int i = 0; i < vec_size; i++){
+        if (sheeplist[i].gEnergy()>merror){
+            sheep2d[sheeplist[i].x() + half * sheeplist[i].y()].push_back(i);
+        }
+    }
+    vec_size = wolflist.size();
+    for (int i = 0; i < vec_size; i++)
+        wolf2d[wolflist[i].x() + half * wolflist[i].y()].push_back(i);
+
+    // parallel for non overlap agent
+    #pragma omp parallel
+    {
+        #pragma omp for
+        for (int i = 0; i < vec_size; i++)
+        {
+            int pos = wolflist[i].x() + wolflist[i].y() * half;
+            if ((wolflist[i].gEnergy() > merror) 
+            && (wolf2d[pos].size()==2) 
+            && (sheep2d[pos].size()==2)){
+                eatSheep_parallel( wolflist[i], sheeplist[sheep2d[pos][1]], sheeplist);
+            }
+        }
+    }
+    // serial for overlapping agents
+    for (int i = 0; i < vec_size; i++)
+    {
+        int pos = wolflist[i].x() + wolflist[i].y() * half;
+        if ((wolflist[i].gEnergy() > merror)
+        && (sheep2d[pos].size() >= 2) 
+        && ((wolf2d[pos].size() != 2) ||
+            (sheep2d[pos].size() != 2) ) ) {
+            eatSheep_overlap( wolflist[i], sheeplist, sheep2d[pos]);
+        }
+    }
+}
+
+void sendTime(int t){
     int world_size;
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
     for (int j = 1; j < world_size; j++){
@@ -885,7 +1020,7 @@ void stopCondition(int t){
     }
 }
 
-void act_master(vector<Animal> &sheeplist, vector<Animal> &wolflist, vector<Grassclass> &grasslist){
+void act_master(vector<Animal> &sheeplist, vector<Animal> &wolflist, vector<Grassclass> &grasslist, int time){
     int world_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
     int world_size;
@@ -894,62 +1029,115 @@ void act_master(vector<Animal> &sheeplist, vector<Animal> &wolflist, vector<Gras
     int* dim = new int [3 * sizeof(int)]();
     gen_agent_processor(dim);
     int* idlist = new int [sizeof(int) * dim[0]];
+    int* idlist_s = new int [sizeof(int) * dim[1]];
+    int* idlist_w = new int [sizeof(int) * dim[2]];
 
     if (world_size < 3){
         // serial
         // //ask grass
         if (Grass != 0)
             ask_patch(grasslist, 0, N);
-        //  ask sheep
-        ask_sheep(sheeplist, grasslist);
-        // //ask wolf
-        ask_wolf(wolflist, sheeplist);
-        get_state(sheeplist, wolflist, grasslist);
+        // //  ask sheep
+        // ask_sheep(sheeplist, grasslist);
+        // // //ask wolf
+        // ask_wolf(wolflist, sheeplist);
+
+        // ask animal for move, reduce energy, death, reproduce
+        vector<Animal> newsheeplist;
+        vector<Animal> newwolflist;
+        int size_s =  sheeplist.size();
+        int size_w =  wolflist.size();
+        ask_animal(1, sheeplist, newsheeplist,0,size_s);
+        ask_animal(2, wolflist, newwolflist,0,size_w);
+        
+        // append new born animals to main vector
+        sheeplist.insert(sheeplist.end(), newsheeplist.begin(), newsheeplist.end());
+        wolflist.insert(wolflist.end(), newwolflist.begin(), newwolflist.end());
+
+        // animal eat grass or eat sheep
+        animal_eat(sheeplist, wolflist, grasslist);
+
+        // pick alive animal in the vector
         vector<Animal> new_sheeplist, new_wolflist;
         renew_vector(sheeplist, new_sheeplist, 0, sheeplist.size());
         renew_vector(wolflist, new_wolflist, 0, wolflist.size());
+        sheeplist = new_sheeplist;
+        wolflist = new_wolflist;
+        // count green grass
+        get_state(sheeplist, wolflist, grasslist);
     }
     else{
         // parallel
-        // grass master
+        // grass master, scatter grass to slave grass (3,6)
         if (Grass != 0)
         {
             gen_agent_rankid(0, dim[0], idlist);
             act_grass_master(grasslist, dim, idlist, MPI_COMM_WORLD);
         }
-        // receive from sheep, wolf 
+        // scatter to slaves sheep (1,4,7)/ wolf (2,5,8)
+        gen_agent_rankid(1, dim[1], idlist_s);
+        animal_scatter(sheeplist, 1, dim, idlist_s, MPI_COMM_WORLD);
+        gen_agent_rankid(2, dim[2], idlist_w);
+        animal_scatter(wolflist, 2, dim, idlist_w, MPI_COMM_WORLD);
+        // do corner case
+        vector<Animal> sheeplist_corner;
+        vector<Animal> wolflist_corner;
+        act_animal_corner( sheeplist, sheeplist_corner, 1, dim);
+        act_animal_corner( wolflist, wolflist_corner, 1, dim);
+        // gather from sheep, wolf 
+        animal_gather(sheeplist, 1, dim, idlist_s, MPI_COMM_WORLD);
+        animal_gather(wolflist, 2, dim, idlist_w, MPI_COMM_WORLD);
+        // append corner case to main vector
+        sheeplist.insert(sheeplist.end(), sheeplist_corner.begin(), sheeplist_corner.end());
+        wolflist.insert(wolflist.end(), wolflist_corner.begin(), wolflist_corner.end());
+        
+        // sheep eat grass, wolf eat sheep
+        animal_eat(sheeplist, wolflist, grasslist);
 
-        // agent eat 
+        // pick alive animal in the vector
+        vector<Animal> new_sheeplist;
+        vector<Animal> new_wolflist;
+        renew_vector(sheeplist, new_sheeplist, 0, sheeplist.size());
+        renew_vector(wolflist, new_wolflist, 0, wolflist.size());
 
-        // state calculate
+        sheeplist.clear();
+        wolflist.clear();
 
-        // send back to agent master and slaves
+        sheeplist = new_sheeplist;
+        wolflist = new_wolflist;
+        // count green grass
+        get_state(sheeplist, wolflist, grasslist);
     }
 
     delete [] dim;
     delete [] idlist;
+    delete [] idlist_s;
+    delete [] idlist_w;
 }
 bool main_slave(int world_rank){
     MPI_Status status;
     int* dim = new int [3 * sizeof(int)]();
     int agent = world_rank % 3;
+    // break while t is the last frame
+    int time;
+    MPI_Recv(&time, 1, MPI_INT, 0, 44, MPI_COMM_WORLD, &status);
+    
     gen_agent_processor(dim);
     // wolf slaves
     int* idlist = new int [sizeof(int) * dim[agent]];
     gen_agent_rankid(agent, dim[agent], idlist);
     if (agent == 0){
         act_grass_slaves(dim, idlist);
-    }else{
+    }
+    else{
         act_animal_slaves(agent, dim, idlist);
     }
-    // break while t is the last frame
-    int tmp;
-    MPI_Recv(&tmp, 1, MPI_INT, 0, 44, MPI_COMM_WORLD, &status);
-    if (tmp == T-1){
+
+    if (time == T-1){
         MPI_Finalize();
-        return true;
+        return false;
     }
-    return false;
+    return true;
 }
 int main(void)
 {
@@ -968,6 +1156,7 @@ int main(void)
 	std::vector<Animal> sheeplist;
     std::vector<Animal> wolflist;
     std::vector<Grassclass> grasslist(N);
+
 #ifdef visualization
     double *sheep = new double [N * T * sizeof(double)];
     double *wolve = new double [N * T * sizeof(double)];
@@ -976,6 +1165,7 @@ int main(void)
     int *animalNum = new int [3 * T * sizeof(int)];
     for (int i = 0; i < 3 * T; i++)
         animalNum[i] = 0;
+    vector<int> animalNumVec(3 * T,0);
     int *setting = new int [2 * sizeof(int)];
     setting[0] = N;
     setting[1] = T;
@@ -988,146 +1178,44 @@ int main(void)
         for (int t = 0; t < T; t++)
         {
     #ifdef visualization
-            // #pragma omp parallel num_threads(3)
-            // {
-            //     int i = omp_get_thread_num();
-            //     if (i ==0){
-                    save2mat(sheep, sheeplist, t);
-                // }
-                // if (i ==1){
-                    save2mat(wolve, wolflist, t);
-                // }
-                // if (i==2){
-                    save2matInt(grass, grasslist, t);
-            //     }
-            // }
+            save2mat(sheep, sheeplist, t);
+            save2mat(wolve, wolflist, t);
+            save2matInt(grass, grasslist, t);
     #endif
+            sendTime(t);
             animalNum[0 + t * 3] = tot_sheep;
             animalNum[1 + t * 3] = tot_wolve;
             animalNum[2 + t * 3] = tot_grass;
-            act_master(sheeplist, wolflist, grasslist);
-            printf("t %d\n",t);
-            stopCondition(t);
-            
+            animalNumVec[0 + t * 3] = tot_sheep;
+            animalNumVec[1 + t * 3] = tot_wolve;
+            animalNumVec[2 + t * 3] = tot_grass;
+            act_master(sheeplist, wolflist, grasslist, t);
+            printf("t %d, s %d, w %d, g %d\n",t, tot_sheep, tot_wolve, tot_grass);
         }
         MPI_Finalize();
-    }else if(world_rank == 1){
-        while(1){
-            MPI_Status status;
-            int* dim = new int [3 * sizeof(int)]();
-            gen_agent_processor(dim);
-            // sheep master
-            int* idlist = new int [sizeof(int) * dim[world_rank]];
-            gen_agent_rankid(world_rank, dim[world_rank], idlist);
-            act_animal_master(sheeplist, world_rank, dim, idlist, MPI_COMM_WORLD);
-
-            //send to master 0
-            // float* energy = new float[size * sizeof(float)];
-            // int* xydf = new int[size * 4 * sizeof(int)];
-            // int size = sheeplist.size();
-            // int size4 = size * 4;
-            // int root = 0;
-            // animalvec2mat(sheeplist, energy, xydf, 0, size);
-            // my_gather(energy, &size, MPI_FLOAT, root, idlist, dim[agent], MPI_COMM_WORLD);
-            // my_gather(xydf, &size4, MPI_INT, root, idlist, dim[agent], MPI_COMM_WORLD);
-
-            //receive from master 0
-
-            // break while t is the last frame
-            int tmp;
-            MPI_Recv(&tmp, 1, MPI_INT, 0, 44, MPI_COMM_WORLD, &status);
-            if (tmp == T-1){
-                MPI_Finalize();
-                break;
+        
+        std::ofstream f("population_dynamic.txt");
+        int count = 0;
+        f << T << ", " << N << ", " << 0 << "\n";
+        for(vector<int>::const_iterator i = animalNumVec.begin(); i != animalNumVec.end(); ++i) {
+            if (count % 3 == 2){
+                f << *i <<  '\n';
+            }else{
+                f << *i <<  ", ";
             }
-        }
-    }else if(world_rank == 2){
-        while(1){
-            MPI_Status status;
-            int* dim = new int [3 * sizeof(int)]();
-            gen_agent_processor(dim);
-            // wolf master
-            int* idlist = new int [sizeof(int) * dim[world_rank]];
-            gen_agent_rankid(world_rank, dim[world_rank], idlist);
-            act_animal_master(wolflist, world_rank, dim, idlist, MPI_COMM_WORLD);
-
-            // break while t is the last frame
-            int tmp;
-            MPI_Recv(&tmp, 1, MPI_INT, 0, 44, MPI_COMM_WORLD, &status);
-            if (tmp == T-1){
-                MPI_Finalize();
-                break;
-            }
+            count++;
         }
     }
     else{
-        bool flag = false;
-        while(flag == false){
+        bool flag = true;
+        while(flag == true){
             flag = main_slave(world_rank);
         }
-        // if (world_rank % 3 == 0){
-        //     while (true){
-        //         MPI_Status status;
-        //         int* dim = new int [3 * sizeof(int)]();
-        //         gen_agent_processor(dim);
-        //         // grass slaves
-        //         int* idlist = new int [sizeof(int) * dim[0]];
-        //         gen_agent_rankid(0, dim[0], idlist);
-        //         act_grass_slaves(dim, idlist);
-
-        //         // break while t is the last frame
-        //         int tmp;
-        //         MPI_Recv(&tmp, 1, MPI_INT, 0, 44, MPI_COMM_WORLD, &status);
-        //         if (tmp == T-1){
-        //             MPI_Finalize();
-        //             break;
-        //         }
-        //     }
-        // }
-        // if (world_rank % 3 == 1){
-        //     while (true){
-        //         MPI_Status status;
-        //         int* dim = new int [3 * sizeof(int)]();
-        //         int agent = world_rank % 3;
-        //         gen_agent_processor(dim);
-        //         // sheep slaves
-        //         int* idlist = new int [sizeof(int) * dim[agent]];
-        //         gen_agent_rankid(agent, dim[agent], idlist);
-        //         act_animal_slaves(agent, dim, idlist);
-
-        //         // break while t is the last frame
-        //         int tmp;
-        //         MPI_Recv(&tmp, 1, MPI_INT, 0, 44, MPI_COMM_WORLD, &status);
-        //         if (tmp == T-1){
-        //             MPI_Finalize();
-        //             break;
-        //         }
-        //     }
-        // }
-        // if (world_rank % 3 ==2){
-        //     while (true){
-        //         MPI_Status status;
-        //         int* dim = new int [3 * sizeof(int)]();
-        //         int agent = world_rank % 3;
-        //         gen_agent_processor(dim);
-        //         // wolf slaves
-        //         int* idlist = new int [sizeof(int) * dim[agent]];
-        //         gen_agent_rankid(agent, dim[agent], idlist);
-        //         act_animal_slaves(agent, dim, idlist);
-
-        //         // break while t is the last frame
-        //         int tmp;
-        //         MPI_Recv(&tmp, 1, MPI_INT, 0, 44, MPI_COMM_WORLD, &status);
-        //         if (tmp == T-1){
-        //             MPI_Finalize();
-        //             break;
-        //         }
-
-        //     }
-        // }
-
     }
 // 	// mat2hdf5(sheep, wolve, grass, animalNum, setting, filename);
+
+    
+
 
 #ifdef visualization
     delete [] sheep;
@@ -1137,7 +1225,6 @@ int main(void)
     delete [] animalNum;
     delete [] setting;
 
-    // MPI_Finalize();
     return 0;
 }
 

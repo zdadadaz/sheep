@@ -1,28 +1,25 @@
 #!/bin/bash
-#SBATCH −−partition=coursework
-#SBATCH −−job−name=:sad_parrot:
+#SBATCH −−partition=cosc
+#SBATCH −−job−name=jc
 #SBATCH −−nodes=1
-#SBATCH −−ntasks=4
-#SBATCH −−ntasks−per−node=4
-#SBATCH −−cpus−per−task=4
+#SBATCH −−ntasks−per−node=12
+#SBATCH −−ntasks=12
+#SBATCH −−cpus−per−task=8
+#SBATCH --time=1:00:00
+#SBATCH --mem=120000
 
-export OMP_NUM_THREADS=4
-export SLURM_TASKS_PER_NODE=4
-export SLURM_NPROCS=4
-
-DATE=$(date +"%Y%m%d%H%M")
-echo "time started "$DATE
-echo "This is job ’$SLURM_JOB_NAME’ (id: $SLURM_JOB_ID) running on the following nodes:"
-echo $SLURM_NODELIST
-echo "running with OMP_NUM_THREADS= $OMP_NUM_THREADS "
-echo "running with SLURM_TASKS_PER_NODE= $SLURM_TASKS_PER_NODE "
-echo "running with SLURM_NPROCS= $SLURM_NPROCS "
-echo "Now we start the show:"
+export SLURM_NNODES=1
+export SLURM_NTASKS=12
+export SLURM_TASKS_PER_NODE=12
+export SLURM_CPUS_PER_TASK=8
+export OMP_NUM_THREADS=8
 export TIMEFORMAT="%E sec"
-
+echo "n ${SLURM_NNODES} tpn ${SLURM_NTASKS} t ${SLURM_TASKS_PER_NODE} ct ${SLURM_CPUS_PER_TASK}"
+# module load gnu
 module load mpi/openmpi-x86_64
-time mpirun -n ${SLURM_NPROCS} ./bin/lcs-hybrid test_input.txt test_output.txt
+make mpi
+
+time mpirun -n ${SLURM_NTASKS} -mca btl ^openib ./sheep_mpi
 
 DATE=$(date +"%Y%m%d%H%M")
 echo "time finished "$DATE
-# echo "we just ran with the following SLURM environment variables" # env | grep SLURM
