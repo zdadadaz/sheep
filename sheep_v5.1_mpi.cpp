@@ -20,6 +20,7 @@
 #define reproduceThreshold 2.0
 #define debug 0
 // #define visualization 1
+#define outputPopulation 1
 #include <vector>
 #include <unordered_set>
 #include <mpi.h>
@@ -27,7 +28,9 @@
 #include <fstream>
 #include <iterator>
 
-// #include "hdf5.h"
+#ifdef visualization
+#include "hdf5.h"
+#endif
 static const char filename[] = "animal.h5";
 
 using namespace std;
@@ -250,9 +253,9 @@ void init_grass(vector<Grassclass> &grasses)
 int eatGrass(Animal &sheep, vector<Grassclass> &grasses)
 {
     int out= 0;
-    omp_lock_t writelock;
-    omp_init_lock(&writelock);
-    omp_set_lock(&writelock);
+    // omp_lock_t writelock;
+    // omp_init_lock(&writelock);
+    // omp_set_lock(&writelock);
     if (grasses[sheep.x() + half * sheep.y()].gNum() == 1)
     {
         sheep.addEnergy();
@@ -260,7 +263,7 @@ int eatGrass(Animal &sheep, vector<Grassclass> &grasses)
         out = 1;
         // tot_grass--;
     }
-    omp_unset_lock(&writelock);
+    // omp_unset_lock(&writelock);
     return out;
 }
 int death(vector<Animal> &animals, Animal &animal)
@@ -500,217 +503,7 @@ void ask_wolf(vector<Animal> &wolflist, vector<Animal> &sheeplist)
         tot_wolve += local_tot;
     }
 }
-void ask_animal_test(int agent, vector<Animal>& animallist, vector<Animal>& newanimallist, vector<Animal>& feedlist, int start, int end)
-{
 
-    int vec_size = end;
-    #pragma omp parallel
-    {
-    #pragma omp for
-        for (int i = start; i < vec_size; i++)
-        {
-            animallist[i].move();
-            animallist[i].reduceEnergy();
-        }
-    }
-    // for (int i = start; i < vec_size; i++)
-    // {
-    //     int out = eatSheep(animallist[i], feedlist);
-    //     tot_sheep -= out;
-    // }
-    #pragma omp parallel
-    {
-        std::vector<Animal> wolflist_tmp;
-        int local_tot = 0;
-        #pragma omp for
-        for (int i = start; i < vec_size; i++)
-        {
-            if (animallist[i].gEnergy() > reproduceThreshold)
-            {
-                int out = reproduce(wolflist_tmp, animallist[i]);
-                local_tot += out;
-            }   
-        }
-        #pragma omp critical
-        {
-            animallist.insert(animallist.end(), wolflist_tmp.begin(), wolflist_tmp.end());
-            tot_wolve += local_tot;
-        }
-    }
-    #pragma omp parallel
-    {
-        int local_tot = 0;
-        #pragma omp for
-        for (int i = start; i < vec_size; i++)
-        {
-            int out = death(animallist, animallist[i]);
-            local_tot -= out;
-        }
-        #pragma omp critical
-        tot_wolve += local_tot;
-    }
-
-    // int vec_size = end;
-    // #pragma omp parallel
-    // {
-    //     #pragma omp for
-    //     for (int i = start; i < vec_size; i++)
-    //     {
-    //         animallist[i].move();
-    //         if ((agent!=1) || ( (agent==1) && (Grass == 1)))
-    //         {
-    //             animallist[i].reduceEnergy();
-    //         }
-    //     }
-    // }
-    
-    //     for (int i = 0; i < vec_size; i++)
-    //     {
-    //         eatSheep(animallist[i], feedlist);
-    //     }
-
-    // #pragma omp parallel
-    // {
-    //     int local_tot = 0;
-    //     #pragma omp for
-    //     for (int i = start; i < vec_size; i++)
-    //     {
-    //         int out = death(animallist, animallist[i]);
-    //         local_tot -= out;
-    //     }
-    // }
-
-    // #pragma omp parallel
-    // {
-    //     std::vector<Animal> animallist_tmp;
-    //     int local_tot = 0;
-    //     #pragma omp for
-    //     for (int i = start; i < vec_size; i++)
-    //     {
-    //         if (animallist[i].gEnergy() > reproduceThreshold) // merror) //
-    //         {
-    //             int out = reproduce(animallist_tmp, animallist[i]);
-    //             local_tot += out;
-    //         }
-    //     }
-    //     #pragma omp critical
-    //     {
-    //         newanimallist.insert(newanimallist.end(), animallist_tmp.begin(), animallist_tmp.end());
-    //         // tot_sheep += local_tot;
-    //     }
-    // }
-}
-void ask_animal_test1(int agent, vector<Animal>& animallist, vector<Animal>& newanimallist, vector<Grassclass>& feedlist, int start, int end)
-{
-    int vec_size = end;
-    #pragma omp parallel
-    {
-        #pragma omp for
-        for (int i = start; i < vec_size; i++)
-        {
-            animallist[i].move();
-            if (Grass == 1)
-            {
-                animallist[i].reduceEnergy();
-            }
-        }
-    }
-    
-    // int local_tot = 0;
-    // for (int i = start; i < vec_size; i++)
-    // {
-    //     if (Grass == 1)
-    //     {
-    //         int out = eatGrass(animallist[i], feedlist);
-    //         local_tot -= out;
-    //     }
-    // }
-    // tot_grass += local_tot;
-
-    #pragma omp parallel
-    {
-        std::vector<Animal> sheeplist_tmp;
-        int local_tot = 0;
-        #pragma omp for
-        for (int i = start; i < vec_size; i++)
-        {
-            if (animallist[i].gEnergy() > reproduceThreshold)
-            {
-                int out = reproduce(sheeplist_tmp, animallist[i]);
-                local_tot += out;
-            }
-        }
-        #pragma omp critical
-        {
-            animallist.insert(animallist.end(), sheeplist_tmp.begin(), sheeplist_tmp.end());
-            tot_sheep += local_tot;
-        }
-    }
-    #pragma omp parallel
-    {
-        int local_tot = 0;
-        #pragma omp for
-        for (int i = start; i < vec_size; i++)
-        {
-            int out = death(animallist, animallist[i]);
-            local_tot -= out;
-        }
-        #pragma omp critical
-        tot_sheep += local_tot;
-    }
-
-    // int vec_size = end;
-    // #pragma omp parallel
-    // {
-    //     #pragma omp for
-    //     for (int i = start; i < vec_size; i++)
-    //     {
-    //         animallist[i].move();
-    //         if ((agent!=1) || ( (agent==1) && (Grass == 1)))
-    //         {
-    //             animallist[i].reduceEnergy();
-    //         }
-    //     }
-    // }
-    
-    // for (int i = start; i < vec_size; i++)
-    // {
-    //     if (Grass == 1)
-    //     {
-    //         eatGrass(animallist[i], feedlist);
-    //     }
-    // }
-    // #pragma omp parallel
-    // {
-    //     int local_tot = 0;
-    //     #pragma omp for
-    //     for (int i = start; i < vec_size; i++)
-    //     {
-    //         int out = death(animallist, animallist[i]);
-    //         local_tot -= out;
-    //     }
-    // }
-
-    // #pragma omp parallel
-    // {
-    //     std::vector<Animal> animallist_tmp;
-    //     int local_tot = 0;
-    //     #pragma omp for
-    //     for (int i = start; i < vec_size; i++)
-    //     {
-    //         if (animallist[i].gEnergy() > reproduceThreshold) // merror) //
-    //         {
-    //             int out = reproduce(animallist_tmp, animallist[i]);
-    //             local_tot += out;
-    //         }
-    //     }
-    //     #pragma omp critical
-    //     {
-    //         newanimallist.insert(newanimallist.end(), animallist_tmp.begin(), animallist_tmp.end());
-    //         // tot_sheep += local_tot;
-    //     }
-    // }
-}
 // move, reduceEnergy, death, reproduce
 void ask_animal(int agent, vector<Animal>& animallist, vector<Animal>& newanimallist, int start, int end)
 {
@@ -1279,11 +1072,7 @@ void act_master(vector<Animal> &sheeplist, vector<Animal> &wolflist, vector<Gras
         // //ask grass
         if (Grass != 0)
             ask_patch(grasslist, 0, N);
-        // //  ask sheep
-        // ask_sheep(sheeplist, grasslist);
-        // // //ask wolf
-        // ask_wolf(wolflist, sheeplist);
-
+        
         // ask animal for move, reduce energy, death, reproduce
         vector<Animal> newsheeplist;
         vector<Animal> newwolflist;
@@ -1291,15 +1080,6 @@ void act_master(vector<Animal> &sheeplist, vector<Animal> &wolflist, vector<Gras
         int size_w =  wolflist.size();
         ask_animal(1, sheeplist, sheeplist,0,size_s);
         ask_animal(2, wolflist, wolflist,0,size_w);
-
-        // test only
-        // ask_animal_test1(1, sheeplist, sheeplist, grasslist, 0,size_s);
-        // ask_animal_test(2, wolflist, wolflist, sheeplist, 0,size_w);
-        // test only
-
-        // append new born animals to main vector
-        // sheeplist.insert(sheeplist.end(), newsheeplist.begin(), newsheeplist.end());
-        // wolflist.insert(wolflist.end(), newwolflist.begin(), newwolflist.end());
 
         // animal eat grass or eat sheep
         animal_eat(sheeplist, wolflist, grasslist);
@@ -1402,6 +1182,8 @@ int main(void)
     std::vector<Animal> wolflist;
     std::vector<Grassclass> grasslist(N);
 
+    
+
 #ifdef visualization
     double *sheep = new double [N * T * sizeof(double)];
     double *wolve = new double [N * T * sizeof(double)];
@@ -1435,10 +1217,11 @@ int main(void)
             animalNumVec[1 + t * 3] = tot_wolve;
             animalNumVec[2 + t * 3] = tot_grass;
             act_master(sheeplist, wolflist, grasslist, t);
-            printf("t %d, s %d, w %d, g %d\n",t, tot_sheep, tot_wolve, tot_grass);
+            // printf("t %d, s %d, w %d, g %d\n",t, tot_sheep, tot_wolve, tot_grass);
         }
         MPI_Finalize();
         
+        #ifdef outputPopulation
         std::ofstream f("population_dynamic.txt");
         int count = 0;
         f << T << ", " << N << ", " << 0 << "\n";
@@ -1450,6 +1233,7 @@ int main(void)
             }
             count++;
         }
+        #endif
     }
     else{
         bool flag = true;
@@ -1457,8 +1241,9 @@ int main(void)
             flag = main_slave(world_rank);
         }
     }
-// 	// mat2hdf5(sheep, wolve, grass, animalNum, setting, filename);
-
+#ifdef visualization
+	mat2hdf5(sheep, wolve, grass, animalNum, setting, filename);
+#endif
     
 
 
