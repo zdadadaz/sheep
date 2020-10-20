@@ -763,6 +763,9 @@ void act_master(vector<Animal> &sheeplist, vector<Animal> &wolflist, vector<Gras
     ask_animal(0, sheeplist, sheeplist,0,size_s);
     ask_animal(1, wolflist, wolflist,0,size_w);
 
+    EndParallel = std::chrono::high_resolution_clock::now();
+    TimeParallel += std::chrono::duration_cast<std::chrono::microseconds>(EndParallel-StartParallel);
+    
     auto StartRenew = std::chrono::high_resolution_clock::now();
     vector<Animal> new_sheeplist, new_wolflist;
     vector<Animal> prev_sheep,next_sheep, prev_wolf, next_wolf;
@@ -796,8 +799,6 @@ void act_master(vector<Animal> &sheeplist, vector<Animal> &wolflist, vector<Gras
 
     auto EndRenew = std::chrono::high_resolution_clock::now();
     
-    EndParallel = std::chrono::high_resolution_clock::now();
-    TimeParallel += std::chrono::duration_cast<std::chrono::microseconds>(EndParallel-StartParallel);
     TimeRenewStat += std::chrono::duration_cast<std::chrono::microseconds>(EndRenew-StartRenew);
 
 }
@@ -840,8 +841,9 @@ int main(int argc, char** argv)
     range_st = (half/world_size) * world_rank;
     range_pp = half/world_size;
 
-    if (rankId==0)
+    if (rankId==0){
         printf("N %d, T %d, iS %d, iW %d, iG %d\n", N,T,initSheepNum,initWolveNum,initGrass);
+    }
 
     // corner case for master
     if (rankId == 0 ){

@@ -7,13 +7,13 @@ CFLAGS = -I$(INCLUDE_DIRS) -L$(LIBRARY_DIRS) -std=c++0x -Wall -lm -O0
 all: serial omp mpi hyb
 
 serial:
-	g++ sheep_v5.1_serial.cpp ${CFLAGS} -o sheep
+	g++ sheep_v7_serial.cpp ${CFLAGS} -o sheep
 omp:
-	g++ -fopenmp sheep_v6.1_omp.cpp ${CFLAGS} -o sheep_omp
+	g++ -fopenmp sheep_v7_omp.cpp ${CFLAGS} -o sheep_omp
 mpi:
-	mpic++ sheep_v6.1_mpi.cpp ${CFLAGS} -o sheep_mpi
+	mpic++ sheep_v7_mpi.cpp ${CFLAGS} -o sheep_mpi
 hyb:
-	mpic++ -fopenmp  sheep_v6.1_hyb.cpp ${CFLAGS} -o sheep_hyb
+	mpic++ -fopenmp  sheep_v7_hyb.cpp ${CFLAGS} -o sheep_hyb
 clean:
 	rm sheep sheep_omp sheep_mpi sheep_hyb
 

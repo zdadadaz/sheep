@@ -814,7 +814,7 @@ void act_master(vector<Animal> &sheeplist, vector<Animal> &wolflist, vector<Gras
     EndParallel = std::chrono::high_resolution_clock::now();
 
     TimeRenewStat += std::chrono::duration_cast<std::chrono::microseconds>(EndParallel-StartParallel);
-    TimeParallel += std::chrono::duration_cast<std::chrono::microseconds>(EndParallel-StartParallel);
+    // TimeParallel += std::chrono::duration_cast<std::chrono::microseconds>(EndParallel-StartParallel);
 
 
 }
