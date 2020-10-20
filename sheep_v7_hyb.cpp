@@ -59,6 +59,11 @@ std::chrono::microseconds TimeInit;
 std::chrono::microseconds TimeRenewStat;
 
 #include <random>
+/** 
+ * random number generation
+ * @param low - range of start value
+ * @param high - range of end value
+ */
 float randFloat(float low, float high)
 {
     thread_local static std::random_device rd;
@@ -67,6 +72,15 @@ float randFloat(float low, float high)
     return urd(rng, decltype(urd)::param_type{low, high});
 }
 
+/** 
+ * write out agents' population dynamic to hdf5 files
+ * @param sdata - sheep info.
+ * @param wdata - sheep info.
+ * @param gdata - sheep info.
+ * @param count - populations for each agent
+ * @param setting - N and T
+ * @param filename - output's filename
+ */
 #ifdef visualization
 int mat2hdf5(double *sdata, double *wdata, int *gdata, int *count, int *setting, const char *filename)
 {
@@ -110,7 +124,13 @@ int mat2hdf5(double *sdata, double *wdata, int *gdata, int *count, int *setting,
     return 0;
 }
 #endif
-
+/** 
+ * List the surrounding pixel of current location x, y
+ * @param curX - x coordination
+ * @param curY - y coordination
+ * @param xlist - x list for outputs
+ * @param ylist - y list for outputs
+ */
 void gen_surroundxy(int curX, int curY, int xlist[8], int ylist[8])
 {
     int xl[8] = {-1, -1, 0, 1, 1, 1, 0, -1};
@@ -121,6 +141,11 @@ void gen_surroundxy(int curX, int curY, int xlist[8], int ylist[8])
         ylist[i] = curY + yl[i];
     }
 }
+/** 
+ * check the x, y is within the map or not, and make it valid
+ * @param tmpX - x coordination
+ * @param tmpY - y coordination
+ */
 void valify_move(int *tmpX, int *tmpY)
 {
     *tmpX = *tmpX < 0 ? (*tmpX + half) : *tmpX;
@@ -155,6 +180,10 @@ int Grassclass::countdown(){
 
 class RandomWalk{
     int sx,sy,sd,rankid, threadId;
+    // x, y location,
+    // direction
+    // the current x,y belongs to which rank id
+    // the current x,y belongs to which thread id
     public:
         RandomWalk(int x, int y, int d);
         void move();
@@ -188,7 +217,6 @@ void RandomWalk::move(){
     rankid = (sx / range_pp) % numRank;
     threadId = sy%numThread;
 }
-
 class Animal: public RandomWalk{
 	int sflag;
 	float energy;
@@ -212,6 +240,11 @@ class Animal: public RandomWalk{
         void sEnergy(float en) {energy = en;}
         int gFlag() {return sflag;};
 };
+/** 
+ * initialize the animals equals to the initGrasnum
+ * @param sheeps - the animal list to process
+ * @param flag - the flag for sheep or wolf(0/1)
+ */
 void init_sheep_wolve(vector<Animal> &sheeps, int flag)
 {
     int direction,x,y;
@@ -255,6 +288,7 @@ void init_sheep_wolve(vector<Animal> &sheeps, int flag)
             }
         }
     }
+    // corner case when initnumber is not divisible 
     int sheepNum = (int)initnumber/numThread;
     if ( sheepNum*numThread  <= initnumber){
         sheepNum *= numThread;
@@ -271,6 +305,10 @@ void init_sheep_wolve(vector<Animal> &sheeps, int flag)
     }
     
 }
+/** 
+ * initialize the grass equals to the initGrasnum
+ * @param grasses - the grass list for output
+ */
 void init_grass(vector<Grassclass> &grasses)
 {
     int grassNum = 0;
@@ -307,6 +345,11 @@ void init_grass(vector<Grassclass> &grasses)
     }
 
 }
+/** 
+ * check if the current sheep has the grass to eat.
+ * @param sheep - the current sheep to process
+ * @param grasses - the grass list to check if sheep has grass to eat
+ */
 int eatGrass(Animal &sheep, vector<Grassclass> &grasses)
 {
     int out= 0;
@@ -323,6 +366,11 @@ int eatGrass(Animal &sheep, vector<Grassclass> &grasses)
     // omp_unset_lock(&writelock);
     return out;
 }
+/** 
+ * check if the current animal has energy smaller than zero
+ * @param animals - the animal list to process
+ * @param animal - the current animal to check if energy < merror
+ */
 int death(vector<Animal> &animals, Animal &animal)
 {
     int out = 0;
@@ -343,6 +391,11 @@ int death(vector<Animal> &animals, Animal &animal)
     }
     return out;
 }
+/** 
+ * check if there is a sheep staying the same location as the current wolf, then wolf can eat it. 
+ * @param wolf - the current wolf to process
+ * @param sheeplist - the sheep list to check if the wolf can eat 
+ */
 int eatSheep(Animal &wolf, vector<Animal> &sheeplist)
 {
     int out = 0;
@@ -360,7 +413,11 @@ int eatSheep(Animal &wolf, vector<Animal> &sheeplist)
     }
     return out;
 }
-
+/** 
+ * Create animal and place it in the surrounding 8 blocks
+ * @param animals - the animal list to process
+ * @param animal - the current animal list to process
+ */
 int create_animal(vector<Animal> &animals, Animal &animal)
 {
     int xlist[8] = {0}, ylist[8] = {0};
@@ -379,6 +436,11 @@ int create_animal(vector<Animal> &animals, Animal &animal)
     }
     return out;
 }
+/** 
+ * Reproduce the animal if the random number < cond_reproduce_rate
+ * @param animals - the animal list to process
+ * @param animal - the current animal list to process
+ */
 int reproduce(vector<Animal> &animals, Animal &animal)
 {
     float randint = (float)randFloat(0., 1.)  *100;
@@ -392,7 +454,10 @@ int reproduce(vector<Animal> &animals, Animal &animal)
     }
     return out;
 }
-
+/** 
+ * Calculate the # of grass in the map
+ * @param grasses - the grass list to process
+ */
 void get_state(vector<Grassclass> &grasses)
 {
     int tot_grass_acc = 0;
@@ -427,6 +492,9 @@ void get_state(vector<Grassclass> &grasses)
     // printf("s %d, w %d, g %d\n", tot_sheep, tot_wolve, tot_grass);
     // printf("s (%d, %d), w (%d, %d), g (%d, %d)\n", tot_sheep, tot_sheep_acc, tot_wolve, tot_wolf_acc, tot_grass, tot_grass_acc);
 }
+/** 
+ * mpi gather # of grass and animal infor. from every processors to the root 0
+ */
 void gather_state(){
     int* stat_tot = new int [3 * numRank * sizeof(int)];
     int stat_loc[3] = {tot_sheep, tot_wolve, tot_grass};
@@ -444,6 +512,12 @@ void gather_state(){
     }
     delete [] stat_tot;
 }
+/** 
+ * initialize grass and animal
+ * @param grasslist - the grass list to process
+ * @param sheeplist - the sheep list to process
+ * @param wolflist - the wolf list for output
+ */
 void initialize_parallel(vector<Grassclass> &grasslist, vector<Animal> &sheeplist, vector<Animal> &wolflist){
 
     init_sheep_wolve(sheeplist, 0);
@@ -457,7 +531,14 @@ void initialize_parallel(vector<Grassclass> &grasslist, vector<Animal> &sheeplis
     }
     gather_state();
 }
-// move, reduceEnergy, death, reproduce
+/** 
+ * Animal move, reduceEnergy, death, reproduce
+ * @param flag - flag for sheep and wolf(0/1)
+ * @param animallist - the animal list to process
+ * @param newanimallist - the animal list for output
+ * @param start - the start point to execute
+ * @param end - the end point to execute
+ */
 void ask_animal(int flag, vector<Animal>& animallist, vector<Animal>& newanimallist, int start, int end)
 {
     int vec_size = end;
@@ -505,6 +586,12 @@ void ask_animal(int flag, vector<Animal>& animallist, vector<Animal>& newanimall
         }
     }
 }
+/** 
+ * Grass count down 
+ * @param grasslist - grass list 
+ * @param start - the start point to execute
+ * @param end - the end point to execute
+ */
 void ask_patch(vector<Grassclass> &grasslist, int start, int end)
 {
     #pragma omp parallel
@@ -518,6 +605,12 @@ void ask_patch(vector<Grassclass> &grasslist, int start, int end)
         }
      }
 }
+/** 
+ * write animal info in vector out to matrices
+ * @param mat - the animal list to process
+ * @param matTime - output matrix stores # of animal
+ * @param t - the current time stamp
+ */
 void save2mat(double *matTime, vector<Animal> &mat, int t)
 {
     // int ID = omp_get_thread_num();
@@ -534,6 +627,12 @@ void save2mat(double *matTime, vector<Animal> &mat, int t)
         }
     }
 }
+/** 
+ * write grass info in vector out to matrices
+ * @param grasslist - the grass list to process
+ * @param matTime - output matrix stores # of grass
+ * @param t - the current time stamp
+ */
 void save2matInt(int *matTime, vector<Grassclass> &grasslist, int t)
 {
     int base = N * t;
@@ -546,6 +645,16 @@ void save2matInt(int *matTime, vector<Grassclass> &grasslist, int t)
         }
     }
 }
+/** 
+ * remove death animal out of vector 
+ * and prepare animal need to be sent to previous and next processor
+ * @param mat - the current animal list to process
+ * @param newMat - the animal list to store alive animal in the same processor
+ * @param prevMat - tthe animal list to store alive animal in the previous processor
+ * @param nextMat - the animal list to store alive animal in the next processor
+* @param start - the start point to execute
+ * @param end - the end point to execute
+ */
 void renew_vector(vector<Animal> &mat,vector<Animal>& newMat, vector<Animal>& prevMat, vector<Animal>& nextMat, int start, int end){
     int vec_size = end;
     int prev_agent = rankId-1;
@@ -580,7 +689,14 @@ void renew_vector(vector<Animal> &mat,vector<Animal>& newMat, vector<Animal>& pr
         }
     }
 }
-
+/** 
+ * write animal info from matrices to vector
+ * @param mat - the grass matrix to be written
+ * @param energy - input of matrix stores energy
+ * @param xyn - input of matrix stores x, y, d and f
+ * @param start - the start point to execute
+ * @param end - the end point to execute
+ */
 void animalvec2mat(vector<Animal> &mat, float *energy, int *xydf, int start, int end){
     int vec_size = end;
     #pragma omp parallel
@@ -596,6 +712,14 @@ void animalvec2mat(vector<Animal> &mat, float *energy, int *xydf, int start, int
         }
     }
 }
+/** 
+ * write animal info in vector out to matrices
+ * @param mat - the animal list to process
+ * @param energy - output matrix stores energy
+ * @param xydf - output matrix stores x, y, d and f
+ * @param start - the start point to execute
+ * @param end - the end point to execute
+ */
 void mat2animalvec(vector<Animal> &mat, float* energy, int* xydf, int energySize){
     int vec_size = energySize;
     #pragma omp parallel
@@ -611,7 +735,13 @@ void mat2animalvec(vector<Animal> &mat, float* energy, int* xydf, int energySize
         mat.insert(mat.end(), local.begin(), local.end());
     }
 }
-
+/** 
+ * write grass info from matrices to vector
+ * @param mat - the grass matrix to be written
+ * @param xyn - input of matrix stores x, y and n
+ * @param start - the start point to execute
+ * @param end - the end point to execute
+ */
 void grassvec2mat(vector<Grassclass> &mat, int* xyn, int start, int end){
     int vec_size = end;
     #pragma omp parallel
@@ -625,6 +755,13 @@ void grassvec2mat(vector<Grassclass> &mat, int* xyn, int start, int end){
         }
     }
 }
+/** 
+ * write grass info in vector out to matrices
+ * @param mat - the grass list to process
+ * @param xyn - output matrix stores x, y and n
+ * @param start - the start point to execute
+ * @param end - the end point to execute
+ */
 void mat2grassvec(vector<Grassclass> &mat, int* xyn, int start, int end){
     int vec_size = end;
     if (mat.size()==0){
@@ -652,28 +789,14 @@ void mat2grassvec(vector<Grassclass> &mat, int* xyn, int start, int end){
     }
 }
 
-void send_animal(vector<Animal>& animallist){
-    int size = animallist.size();
-    float* energy = new float[size * sizeof(float)];
-    int* xydf = new int[size * 4 * sizeof(int)];
-    animalvec2mat(animallist, energy, xydf, 0, size);
-    MPI_Send(energy, size, MPI_FLOAT, 0, 0, MPI_COMM_WORLD);
-    MPI_Send(xydf, size*4, MPI_INT, 0, 0, MPI_COMM_WORLD);
-    delete [] energy;
-    delete [] xydf;
-}
-void receive_animal(vector<Animal>& animallist, int agent){
-    int iniNum = agent == 1? initSheepNum:initWolveNum;
-    float* energy = new float [iniNum * sizeof(float)];
-    int* xydf = new int [iniNum * 4 * sizeof(int)];
-    MPI_Recv(energy, iniNum, MPI_FLOAT, agent, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    MPI_Recv(xydf, iniNum * 4, MPI_INT, agent, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    mat2animalvec(animallist, energy, xydf, iniNum);
-    delete [] energy;
-    delete [] xydf;
-}
-
-
+/** 
+ * Send and receive size of sending and received vector from previous and next processor
+ * @param buf - the buffer to store received size of vector in the following programs
+ * @param senddata - the data will be sent to previous and next processor
+ * @param prev - previous rank id
+ * @param next - next rank id
+ * @param rank - current rank id 
+ */
 void send_receive_neighbor_size(int* buf, int* senddata,int prev, int next, int rank){
     MPI_Request reqs[4];   // required variable for non-blocking calls
     MPI_Status stats[4];   // required variable for Waitall routine
@@ -689,7 +812,17 @@ void send_receive_neighbor_size(int* buf, int* senddata,int prev, int next, int 
     MPI_Waitall(4, reqs, stats);
 
 }
-
+/** 
+* Send and receive agent info. of sending and received vector from previous and next processor
+ * @param pvec - the vector list need to be sent to previous processor
+ * @param nvec - the vector list need to be sent to next processor
+ * @param out - the received vector list from previous and next processor
+ * @param rec_num - receive number [prev_sheep, prev wolf, next sheep, next wolf]
+ * @param prev - previous rank id
+ * @param next - next rank id
+ * @param rank - current rank id 
+ * @param flag - the flag for sheep or wolf (0/1)
+ */
 void send_receive_neighbor_animal(vector<Animal>& pvec, vector<Animal>& nvec, vector<Animal>& out, int* rec_num, int prev, int next, int rank, int flag){
     //send receive two node (prev/next)
     MPI_Request reqs[8];   // required variable for non-blocking calls
@@ -738,7 +871,12 @@ void send_receive_neighbor_animal(vector<Animal>& pvec, vector<Animal>& nvec, ve
     delete [] n_rec_energy;
     delete [] n_rec_xydf;
 }
-
+/** 
+ * Animal eat in omp parallel way
+ * @param sheeplist - the sheep list to process
+ * @param wolflist - the wolf list to process
+ * @param grasslist - the grass list to process
+ */
 void animal_eat(vector<Animal> &sheeplist, vector<Animal> &wolflist, vector<Grassclass> &grasslist){
     int vec_size_s = sheeplist.size(), vec_size_w = wolflist.size();
     vector<vector<int>> sheep2d(numThread, vector<int>(0,0));
@@ -748,8 +886,6 @@ void animal_eat(vector<Animal> &sheeplist, vector<Animal> &wolflist, vector<Gras
         // record index for sheep
         #pragma omp for
         for (int i= 0; i < numThread; i++){
-            // int ID = omp_get_thread_num();
-            // printf("i%d ID %d\n ",i,ID);
             for (int j = 0; j < vec_size_s; j++){
                  if (sheeplist[j].t() == i){
                     sheep2d[i].push_back(j);
@@ -792,15 +928,21 @@ void animal_eat(vector<Animal> &sheeplist, vector<Animal> &wolflist, vector<Gras
     }
 
 }
-
-void act_master(vector<Animal> &sheeplist, vector<Animal> &wolflist, vector<Grassclass> &grasslist, int time){
+/** 
+ * execute each grass agent for countdown
+ * execute each animal agent for move, death, reproduce, eat
+ * @param sheeplist - the sheep list to process
+ * @param wolflist - the wolf list to process
+ * @param grasslist - the grass list to process
+ */
+void act_master(vector<Animal> &sheeplist, vector<Animal> &wolflist, vector<Grassclass> &grasslist){
     auto StartParallel = std::chrono::high_resolution_clock::now();
     int prev_rank = rankId - 1;
     int next_rank = rankId + 1;
     prev_rank = prev_rank>=0 ? prev_rank:(numRank-1);
     next_rank = next_rank<numRank ? next_rank:(next_rank-numRank);
 
-    // //ask grass
+    //ask grass to cound down 
     if (Grass != 0){
         ask_patch(grasslist, range_pp * rankId, range_pp * (rankId+1));
         if (numRank*range_pp < half){
@@ -972,7 +1114,7 @@ int main(int argc, char** argv)
         animalNumVec[0 + t * 3] = tot_sheep;
         animalNumVec[1 + t * 3] = tot_wolve;
         animalNumVec[2 + t * 3] = tot_grass;
-        act_master(sheeplist, wolflist, grasslist, t);
+        act_master(sheeplist, wolflist, grasslist);
         
     }
     MPI_Finalize();
