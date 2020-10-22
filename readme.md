@@ -1,12 +1,12 @@
 # File descriptions
 ## Main function: 
 There are 4 four files for each porpuse, but only hybrid version has complete comments.
-* Serial: sheep_v7_serial.cpp
-* OpenMP: sheep_v7_omp.cpp
-* MPI: sheep_v7_mpi.cpp
-* Hybrid: sheep_v7_hyb.cpp
+* Serial: sheep_serial.cpp
+* OpenMP: sheep_omp.cpp
+* MPI: sheep_mpi.cpp
+* Hybrid: sheep_hyb.cpp
 ## Visualization: 
-* makevideo.py: generate videos for plot and Visualization( only for serial)
+* makevideo.py: generate videos for plot and Visualization( only for serial, make file should add -lhdf5 before compiling)
 * plotNum.py: plot the static population dynamic( only for serial)
 * plotNum_txt.py: plot the static population dynamic ( can be used for all file, needed turn on **outputPopulation** in definition)
 ## Testing: 

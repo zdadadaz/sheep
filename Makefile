@@ -1,19 +1,18 @@
 LIBRARY_DIRS = ~/usr/lib
 INCLUDE_DIRS = ~/usr/include
-# CFLAGS = -I$(INCLUDE_DIRS) -L$(LIBRARY_DIRS)  -lm -O0
 CFLAGS = -I$(INCLUDE_DIRS) -L$(LIBRARY_DIRS) -std=c++0x -Wall -lm -O0
-# CFLAGS = -I$(INCLUDE_DIRS) -L$(LIBRARY_DIRS) -lhdf5 -std=c++0x -Wall -lm -O0
+# -lhdf5
 
 all: serial omp mpi hyb
 
 serial:
-	g++ sheep_v7_serial.cpp ${CFLAGS} -o sheep
+	g++ sheep_serial.cpp ${CFLAGS} -o sheep 
 omp:
-	g++ -fopenmp sheep_v7_omp.cpp ${CFLAGS} -o sheep_omp
+	g++ -fopenmp sheep_omp.cpp ${CFLAGS} -o sheep_omp
 mpi:
-	mpic++ sheep_v7_mpi.cpp ${CFLAGS} -o sheep_mpi
+	mpic++ sheep_mpi.cpp ${CFLAGS} -o sheep_mpi
 hyb:
-	mpic++ -fopenmp  sheep_v7_hyb.cpp ${CFLAGS} -o sheep_hyb
+	mpic++ -fopenmp  sheep_hyb.cpp ${CFLAGS} -o sheep_hyb
 clean:
 	rm sheep sheep_omp sheep_mpi sheep_hyb
 
