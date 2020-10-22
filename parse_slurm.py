@@ -6,10 +6,10 @@ outpath = './'
 
 dictout = defaultdict(list)
 dictout_num = defaultdict(list)
-onlyfiles = [f for f in listdir(outpath) if isfile(join(outpath, f)) and f[-3:] == "out"]
+onlyfiles = [f for f in listdir(outpath) if isfile(join(outpath, f)) and f[-3:] == "out" and f[:5]=='slurm']
 for f in onlyfiles:
-    # if f == 'slurm-6705156.out':
-        # continue
+    if f == 'slurm-6708450.out':
+        continue
     with open(join(outpath, f), 'r') as f:
         script = f.read().split('\n')
         key = [script[1]] + script[0].split(' ')  + script[2].replace(',','').split(' ')
@@ -43,6 +43,6 @@ for i in range(len(dictout.keys())):
             df.iloc[i,j] = int(key[(j-1)*2+2])
     for j in range(10,16):
         df.iloc[i,j] = avg[j-10]
-print(df.sort_values(by='N'))
-# print(df[df['exe']=='sheep_mpi'].sort_values(by=['N','tpn']))
+# print(df.sort_values(by='N'))
+print(df[df['exe']=='sheep_hyb'].sort_values(by=['N','tpn','ct']))
 

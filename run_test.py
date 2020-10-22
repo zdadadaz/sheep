@@ -44,31 +44,49 @@ def rw_template(path, outpath, input_setting, input_para,exefile):
         f.write(temp)
 
 def strong_test(input_para):
-    nodes =[1,1]
-    tpn =   [8,16]
-    nt =    [8,16]
-    omp =   [2,2]
-    # nodes =[2,4]
-    # tpn =   [8,8]
-    # nt =    [16,32]
-    # omp =   [2,2]
-    # nodes = [1 for i in range(5)]
-    # tpn = [1 for i in range(5)]
-    # nt = [1 for i in range(5)]
-    # omp = [1<<i for i in range(5)]
-    for exe in range(3,4):
+    nodes = [1 for i in range(5)] + [1 for i in range(5)] + [1 for i in range(5)]
+    tpn = [1 for i in range(5)] + [1<<i for i in range(5)] +[1<<i for i in range(4)] + [12]
+    nt = [1 for i in range(5)] + [1<<i for i in range(5)] + [1<<i for i in range(4)] + [12]
+    omp = [1<<i for i in range(5)] + [1 for i in range(5)] +  [1<<i for i in range(3)] + [3,2]
+    for exe in range(2,4):
         exefile = exefile_dict[exe]
         for i in range(len(nodes)):
+            if exe <= 1 and i >4:
+                continue
+            if exe >1 and i <5:
+                continue
             input_setting = [nodes[i], tpn[i], nt[i], omp[i]]
             rw_template(template_path, outpath, input_setting, input_para, exefile)
             if exe == 0:
                 break
 
-input_para = [10000, 1000, 400, 200, 5000]
-strong_test(input_para)
+def soft_test():
+    input_para = [[10000, 1000, 400, 200, 5000],  [40000, 1000, 1600, 800, 20000], \
+                [90000, 1000,  4000, 2000, 45000],  [160000, 1000, 6400, 3200, 80000],  [250000, 1000, 8000, 4000, 125000]]
+    nodes = [1 for i in range(5)] + [1 for i in range(5)]
+    tpn = [1 for i in range(5)] + [1<<i for i in range(5)]
+    nt = [1 for i in range(5)] + [1<<i for i in range(5)]
+    omp = [1<<i for i in range(5)] + [1 for i in range(5)]
+    for exe in range(0,4):
+        exefile = exefile_dict[exe]
+        for i in range(len(nodes)):
+            _input = input_para[i%5]
+            if exe <= 1 and i >4:
+                continue
+            if exe >1 and i <5:
+                continue
+            input_setting = [nodes[i], tpn[i], nt[i], omp[i]]
+            rw_template(template_path, outpath, input_setting, _input, exefile)
+            if exe == 0:
+                break
+
+# input_para = [10000, 1000, 400, 200, 5000]
+# strong_test(input_para)
 
 input_para = [160000, 1000, 25600, 12800, 80000]
 strong_test(input_para)
+
+soft_test()
 
 # exefile = "sheep"
 # n, tpn, nt, omp, 
